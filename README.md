@@ -1,7 +1,7 @@
 # VividAI
 
 <div align="center">
-  <img src="assets/hero-banner.png" alt="VividAI Hero Banner" width="100%">
+  <img src="assets/readme-banner.png" alt="VividAI Hero Banner" width="100%">
   <br>
   <h1>Meeting Transcriber & Summarizer</h1>
   <p>
