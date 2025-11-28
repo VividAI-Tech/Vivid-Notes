@@ -15,6 +15,16 @@
 </head>
 
 <body>
+    <!-- Global Immersive Background -->
+    <div class="global-bg">
+        <div class="grid-overlay"></div>
+        <div class="glow-orb orb-1"></div>
+        <div class="glow-orb orb-2"></div>
+        <div class="glow-orb orb-3"></div>
+        <div class="floating-shape shape-1"></div>
+        <div class="floating-shape shape-2"></div>
+    </div>
+
     <nav class="navbar">
         <div class="container nav-container">
             <a href="#" class="logo">
@@ -25,6 +35,7 @@
                 <a href="#features">Features</a>
                 <a href="#how-it-works">How it Works</a>
                 <a href="#pricing">Pricing</a>
+                <a href="docs.html">Docs</a>
                 <a href="#faq">FAQ</a>
             </div>
             <a href="#" class="btn btn-primary nav-cta">Add to Chrome</a>
@@ -33,25 +44,27 @@
 
     <header class="hero">
         <div class="container hero-container">
-            <div class="hero-content">
-                <div class="badge">✨ AI-Powered Meeting Assistant</div>
-                <h1>Your Intelligent Meeting Copilot</h1>
+            <div class="hero-content fade-in-up">
+                <div class="badge-glow">✨ AI-Powered Meeting Assistant</div>
+                <h1 class="glitch-text" data-text="Your Intelligent Meeting Copilot">Your Intelligent Meeting Copilot
+                </h1>
                 <p>VividAI's smart bot automates your meeting workflow. Schedule it to join calls, record, transcribe,
                     and summarize automatically. Works on Google Meet, Zoom, Teams, and more.</p>
                 <div class="hero-btns">
-                    <a href="#" class="btn btn-primary btn-lg">
+                    <a href="#" class="btn btn-primary btn-lg btn-glow">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
                             <path
                                 d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z" />
                         </svg>
                         Add to Chrome - It's Free
                     </a>
-                    <a href="#demo" class="btn btn-secondary btn-lg">Watch Demo</a>
+                    <button id="watchDemoBtn" class="btn btn-secondary btn-lg btn-glass">
+                        <span class="play-icon">▶</span> Watch Demo
+                    </button>
                 </div>
                 <div class="hero-trust">
                     <span>Trusted by professionals at</span>
                     <div class="logos">
-                        <!-- Placeholders for trust logos -->
                         <span class="trust-logo">Google</span>
                         <span class="trust-logo">Microsoft</span>
                         <span class="trust-logo">Spotify</span>
@@ -59,55 +72,110 @@
                     </div>
                 </div>
             </div>
-            <div class="hero-image">
-                <div class="hero-glow"></div>
-                <img src="assets/hero-blended.png" alt="VividAI Dashboard" class="dashboard-preview">
+            <div class="hero-visual fade-in-right">
+                <div class="video-card-wrapper">
+                    <div class="video-card-glow"></div>
+                    <div class="video-card">
+                        <div class="video-header">
+                            <div class="dot red"></div>
+                            <div class="dot yellow"></div>
+                            <div class="dot green"></div>
+                        </div>
+                        <img src="assets/hero-blended.png" alt="VividAI Dashboard" class="dashboard-preview">
+                        <div class="live-indicator">
+                            <span class="pulse-dot"></span> LIVE TRANSCRIPTION
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </header>
 
     <section id="features" class="features">
         <div class="container">
-            <div class="section-header">
+            <div class="section-header fade-in">
                 <h2>Supercharge Your Meetings</h2>
                 <p>Everything you need to stay focused and productive.</p>
             </div>
-            <div class="feature-grid">
-                <div class="feature-card">
-                    <div class="icon-box">🎙️</div>
-                    <h3>Universal Recording</h3>
-                    <p>Works seamlessly on Google Meet, Zoom, Teams, Webex, and even WhatsApp Web.</p>
+
+            <!-- Bento Grid Layout -->
+            <div class="bento-grid">
+                <div class="bento-item large span-2" data-tilt>
+                    <div class="bento-bg" style="background-image: url('assets/bg-recording.png');"></div>
+                    <div class="bento-content">
+                        <img src="assets/icon-mic.png" alt="Mic Icon" class="bento-icon">
+                        <h3>Universal Recording</h3>
+                        <p>Works seamlessly on Google Meet, Zoom, Teams, Webex, and even WhatsApp Web.</p>
+                        <div class="bento-visual wave-visual">
+                            <!-- CSS Audio Wave Animation -->
+                            <div class="bar"></div>
+                            <div class="bar"></div>
+                            <div class="bar"></div>
+                            <div class="bar"></div>
+                            <div class="bar"></div>
+                        </div>
+                    </div>
                 </div>
-                <div class="feature-card">
-                    <div class="icon-box">⚡</div>
-                    <h3>Real-time Transcription</h3>
-                    <p>Powered by OpenAI Whisper for industry-leading accuracy in over 50 languages.</p>
+                <div class="bento-item" data-tilt>
+                    <div class="bento-bg" style="background-image: url('assets/bg-transcription.png');"></div>
+                    <div class="bento-content">
+                        <img src="assets/icon-lightning.png" alt="Lightning Icon" class="bento-icon">
+                        <h3>Real-time Transcription</h3>
+                        <p>Powered by OpenAI Whisper for industry-leading accuracy in over 50 languages.</p>
+                        <img src="assets/feature-transcription.png" alt="Transcription UI" class="bento-img-overlay">
+                    </div>
                 </div>
-                <div class="feature-card">
-                    <div class="icon-box">📝</div>
-                    <h3>Smart Summaries</h3>
-                    <p>Get auto-generated meeting minutes, key takeaways, and action items instantly.</p>
+                <div class="bento-item" data-tilt>
+                    <div class="bento-bg" style="background-image: url('assets/bg-summary.png');"></div>
+                    <div class="bento-content">
+                        <img src="assets/icon-notes.png" alt="Notes Icon" class="bento-icon">
+                        <h3>Smart Summaries</h3>
+                        <p>Get auto-generated meeting minutes, key takeaways, and action items instantly.</p>
+                        <img src="assets/feature-analytics.png" alt="Analytics UI" class="bento-img-overlay">
+                    </div>
                 </div>
-                <div class="feature-card">
-                    <div class="icon-box">🤖</div>
-                    <h3>Intelligent Bot</h3>
-                    <p>Schedule the VividAI Bot to automatically join and record your meetings, so you never miss a
-                        moment.</p>
+                <div class="bento-item tall span-row-2" data-tilt>
+                    <div class="bento-bg" style="background-image: url('assets/bg-bot.png');"></div>
+                    <div class="bento-content">
+                        <img src="assets/icon-bot.png" alt="Bot Icon" class="bento-icon">
+                        <h3>Intelligent Bot</h3>
+                        <p>Schedule the VividAI Bot to automatically join and record your meetings, so you never miss a
+                            moment.</p>
+                        <div class="bot-visual">
+                            <img src="assets/feature-bot.png" alt="VividAI Bot" class="bot-mascot">
+                        </div>
+                    </div>
                 </div>
-                <div class="feature-card">
-                    <div class="icon-box">📅</div>
-                    <h3>Auto-Scheduling</h3>
-                    <p>Paste your meeting links and let VividAI handle the rest. Supports recurring meetings and
-                        calendar integration.</p>
+                <div class="bento-item" data-tilt>
+                    <div class="bento-bg" style="background-image: url('assets/bg-calendar.png');"></div>
+                    <div class="bento-content">
+                        <img src="assets/icon-calendar.png" alt="Calendar Icon" class="bento-icon">
+                        <h3>Auto-Scheduling</h3>
+                        <p>Paste your meeting links and let VividAI handle the rest.</p>
+                    </div>
                 </div>
-                <div class="feature-card">
-                    <div class="icon-box">📊</div>
-                    <h3>Audio Visualizer</h3>
-                    <p>Beautiful real-time audio visualization to ensure you're capturing everything.</p>
+                <div class="bento-item" data-tilt>
+                    <div class="bento-bg" style="background-image: url('assets/bg-visualizer.png');"></div>
+                    <div class="bento-content">
+                        <img src="assets/icon-visualizer.png" alt="Visualizer Icon" class="bento-icon">
+                        <h3>Audio Visualizer</h3>
+                        <p>Beautiful real-time audio visualization.</p>
+                    </div>
                 </div>
             </div>
         </div>
     </section>
+
+    <!-- Video Modal -->
+    <div id="videoModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <div class="video-placeholder">
+                <div class="play-button-large">▶</div>
+                <p>Demo Video Coming Soon</p>
+            </div>
+        </div>
+    </div>
 
     <section class="comparison">
         <div class="container">

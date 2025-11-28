@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VividAI - Documentation</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* Docs Specific Styles */
+        .docs-layout {
+            display: grid;
+            grid-template-columns: 250px 1fr;
+            min-height: 100vh;
+            padding-top: 80px;
+            /* Space for fixed navbar */
+        }
+
+        .docs-sidebar {
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(10px);
+            border-right: 1px solid var(--glass-border);
+            padding: 24px;
+            position: fixed;
+            top: 80px;
+            bottom: 0;
+            width: 250px;
+            overflow-y: auto;
+        }
+
+        .docs-content {
+            grid-column: 2;
+            padding: 48px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .docs-nav-item {
+            display: block;
+            padding: 12px 16px;
+            color: var(--text-gray);
+            text-decoration: none;
+            border-radius: 8px;
+            margin-bottom: 4px;
+            transition: all 0.2s ease;
+        }
+
+        .docs-nav-item:hover,
+        .docs-nav-item.active {
+            background: rgba(249, 115, 22, 0.1);
+            color: var(--primary);
+        }
+
+        .docs-section {
+            margin-bottom: 64px;
+            scroll-margin-top: 100px;
+        }
+
+        .docs-section h1 {
+            font-size: 42px;
+            margin-bottom: 24px;
+            background: linear-gradient(to right, #fff, #94A3B8);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .docs-section h2 {
+            font-size: 28px;
+            margin-bottom: 16px;
+            color: var(--text-light);
+            border-bottom: 1px solid var(--glass-border);
+            padding-bottom: 8px;
+        }
+
+        .docs-section h3 {
+            font-size: 20px;
+            margin: 24px 0 12px;
+            color: var(--text-light);
+        }
+
+        .docs-section p {
+            color: var(--text-gray);
+            line-height: 1.8;
+            margin-bottom: 16px;
+        }
+
+        .code-block {
+            background: #0f172a;
+            border: 1px solid var(--glass-border);
+            border-radius: 8px;
+            padding: 16px;
+            font-family: monospace;
+            color: #e2e8f0;
+            overflow-x: auto;
+            margin-bottom: 24px;
+        }
+
+        .step-list {
+            counter-reset: step;
+            list-style: none;
+            padding: 0;
+        }
+
+        .step-list li {
+            position: relative;
+            padding-left: 48px;
+            margin-bottom: 24px;
+        }
+
+        .step-list li::before {
+            counter-increment: step;
+            content: counter(step);
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 32px;
+            height: 32px;
+            background: var(--glass);
+            border: 1px solid var(--primary);
+            color: var(--primary);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+
+        @media (max-width: 768px) {
+            .docs-layout {
+                grid-template-columns: 1fr;
+            }
+
+            .docs-sidebar {
+                display: none;
+                /* Mobile menu needed in real app */
+            }
+
+            .docs-content {
+                grid-column: 1;
+                padding: 24px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Global Immersive Background -->
+    <div class="global-bg">
+        <div class="grid-overlay"></div>
+        <div class="glow-orb orb-1"></div>
+        <div class="glow-orb orb-2"></div>
+        <div class="glow-orb orb-3"></div>
+    </div>
+
+    <!-- Navbar -->
+    <nav class="navbar">
+        <div class="container nav-container">
+            <a href="index.html" class="logo">
+                <div class="logo-icon">
+                    <div class="logo-bar bar-1"></div>
+                    <div class="logo-bar bar-2"></div>
+                    <div class="logo-bar bar-3"></div>
+                </div>
+                VividAI
+            </a>
+            <div class="nav-links">
+                <a href="index.html#features">Features</a>
+                <a href="index.html#how-it-works">How it Works</a>
+                <a href="index.html#pricing">Pricing</a>
+                <a href="docs.html" class="active">Docs</a>
+            </div>
+            <a href="#" class="btn btn-primary btn-glow">Add to Chrome</a>
+        </div>
+    </nav>
+
+    <div class="docs-layout">
+        <aside class="docs-sidebar">
+            <nav>
+                <a href="#introduction" class="docs-nav-item active">Introduction</a>
+                <a href="#installation" class="docs-nav-item">Installation</a>
+                <a href="#getting-started" class="docs-nav-item">Getting Started</a>
+                <a href="#features" class="docs-nav-item">Key Features</a>
+                <a href="#troubleshooting" class="docs-nav-item">Troubleshooting</a>
+                <a href="#faq" class="docs-nav-item">FAQ</a>
+            </nav>
+        </aside>
+
+        <main class="docs-content">
+            <section id="introduction" class="docs-section">
+                <h1>Documentation</h1>
+                <p>Welcome to the VividAI documentation. Learn how to install, configure, and use your intelligent
+                    meeting copilot to automate your workflow.</p>
+            </section>
+
+            <section id="installation" class="docs-section">
+                <h2>Installation</h2>
+                <p>VividAI is a Chrome Extension. Follow these steps to install it:</p>
+                <ol class="step-list">
+                    <li>
+                        <h3>Visit the Chrome Web Store</h3>
+                        <p>Go to the VividAI page on the Chrome Web Store (link coming soon).</p>
+                    </li>
+                    <li>
+                        <h3>Add to Chrome</h3>
+                        <p>Click the "Add to Chrome" button and confirm the installation permissions.</p>
+                    </li>
+                    <li>
+                        <h3>Pin the Extension</h3>
+                        <p>Click the puzzle piece icon in your browser toolbar and pin VividAI for easy access.</p>
+                    </li>
+                </ol>
+            </section>
+
+            <section id="getting-started" class="docs-section">
+                <h2>Getting Started</h2>
+                <p>Once installed, you need to configure your AI settings.</p>
+
+                <h3>1. Open Settings</h3>
+                <p>Click the VividAI icon and select the gear icon to open the Options page.</p>
+
+                <h3>2. Choose Your AI Model</h3>
+                <p>You can use OpenAI (Cloud) or Ollama (Local) for privacy.</p>
+                <div class="code-block">
+                    // Example Configuration
+                    Provider: OpenAI
+                    API Key: sk-proj-... (Your Key)
+                </div>
+                <p><strong>Note:</strong> OpenAI provides $120/month in free credits for new users, which covers
+                    approximately 300 hours of transcription.</p>
+            </section>
+
+            <section id="features" class="docs-section">
+                <h2>Key Features</h2>
+
+                <h3>Universal Recording</h3>
+                <p>VividAI works on any tab that plays audio. Simply click "Start Recording" to capture system audio
+                    from Google Meet, Zoom, Teams, or any other platform.</p>
+
+                <h3>Real-time Transcription</h3>
+                <p>As the meeting progresses, you'll see a live transcription of the conversation. We support over 50
+                    languages with auto-detection.</p>
+
+                <h3>Smart Summaries</h3>
+                <p>After the recording stops, click "Summarize" to get:</p>
+                <ul>
+                    <li>Meeting Minutes</li>
+                    <li>Key Takeaways</li>
+                    <li>Action Items</li>
+                </ul>
+            </section>
+
+            <section id="troubleshooting" class="docs-section">
+                <h2>Troubleshooting</h2>
+                <p>Common issues and fixes:</p>
+                <ul>
+                    <li><strong>No Audio Recorded:</strong> Ensure you selected "Share System Audio" when the browser
+                        prompt appeared.</li>
+                    <li><strong>Transcription Failed:</strong> Check your API key in settings and ensure you have
+                        sufficient credits.</li>
+                </ul>
+            </section>
+        </main>
+    </div>
+
+    <!-- Cursor Follower Script -->
+    <script>
+        const cursor = document.createElement('div');
+        cursor.classList.add('cursor-follower');
+        document.body.appendChild(cursor);
+
+        document.addEventListener('mousemove', (e) => {
+            cursor.style.left = e.clientX + 'px';
+            cursor.style.top = e.clientY + 'px';
+        });
+
+        document.querySelectorAll('a, button, .docs-nav-item').forEach(el => {
+            el.addEventListener('mouseenter', () => {
+                cursor.style.transform = 'translate(-50%, -50%) scale(2.5)';
+                cursor.style.background = 'rgba(249, 115, 22, 0.2)';
+            });
+            el.addEventListener('mouseleave', () => {
+                cursor.style.transform = 'translate(-50%, -50%) scale(1)';
+                cursor.style.background = 'rgba(249, 115, 22, 0.5)';
+            });
+        });
+    </script>
+</body>
+
+</html>

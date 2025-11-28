@@ -35,19 +35,77 @@ document.addEventListener('DOMContentLoaded', () => {
         entries.forEach(entry => {
             if (entry.isIntersecting) {
                 entry.target.classList.add('visible');
-                observer.unobserve(entry.target);
+                observer.unobserve(entry.target); // Only animate once
             }
         });
     }, observerOptions);
 
-    // Animate elements
-    const animateElements = document.querySelectorAll('.feature-card, .hero-content, .hero-image, .comparison-box, .step-card, .pricing-card, .faq-item');
-
-    animateElements.forEach(el => {
-        el.style.opacity = '0';
-        el.style.transform = 'translateY(30px)';
-        el.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+    document.querySelectorAll('.fade-in, .fade-in-up, .fade-in-right').forEach(el => {
         observer.observe(el);
+    });
+
+    // Tilt Effect for Bento Grid
+    document.querySelectorAll('.bento-item').forEach(item => {
+        item.addEventListener('mousemove', (e) => {
+            const rect = item.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            const centerX = rect.width / 2;
+            const centerY = rect.height / 2;
+
+            const rotateX = ((y - centerY) / centerY) * -5; // Max 5deg rotation
+            const rotateY = ((x - centerX) / centerX) * 5;
+
+            item.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale(1.02)`;
+        });
+
+        item.addEventListener('mouseleave', () => {
+            item.style.transform = 'perspective(1000px) rotateX(0) rotateY(0) scale(1)';
+        });
+    });
+
+    // Video Modal Logic
+    const modal = document.getElementById('videoModal');
+    const btn = document.getElementById('watchDemoBtn');
+    const close = document.querySelector('.close-modal');
+
+    if (btn && modal && close) {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            modal.style.display = 'flex';
+        });
+
+        close.addEventListener('click', () => {
+            modal.style.display = 'none';
+        });
+
+        window.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.style.display = 'none';
+            }
+        });
+    }
+
+    // Cursor Follower
+    const cursor = document.createElement('div');
+    cursor.classList.add('cursor-follower');
+    document.body.appendChild(cursor);
+
+    document.addEventListener('mousemove', (e) => {
+        cursor.style.left = e.clientX + 'px';
+        cursor.style.top = e.clientY + 'px';
+    });
+
+    document.querySelectorAll('a, button, .bento-item').forEach(el => {
+        el.addEventListener('mouseenter', () => {
+            cursor.style.transform = 'translate(-50%, -50%) scale(2.5)';
+            cursor.style.background = 'rgba(249, 115, 22, 0.2)';
+        });
+        el.addEventListener('mouseleave', () => {
+            cursor.style.transform = 'translate(-50%, -50%) scale(1)';
+            cursor.style.background = 'rgba(249, 115, 22, 0.5)';
+        });
     });
 
     // FAQ Accordion
@@ -56,17 +114,19 @@ document.addEventListener('DOMContentLoaded', () => {
     faqItems.forEach(item => {
         const question = item.querySelector('.faq-question');
         question.addEventListener('click', () => {
-            // Close other items
+            const isActive = item.classList.contains('active');
+
+            // Close all other items
             faqItems.forEach(otherItem => {
-                if (otherItem !== item) {
-                    otherItem.classList.remove('active');
-                }
+                otherItem.classList.remove('active');
             });
+
             // Toggle current item
-            item.classList.toggle('active');
+            if (!isActive) {
+                item.classList.add('active');
+            }
         });
     });
-
     // Add visible class styles dynamically
     const style = document.createElement('style');
     style.textContent = `

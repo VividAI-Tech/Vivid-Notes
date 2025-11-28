@@ -1,2 +1,2 @@
-.agent
-.DS_Store
+*.agent*
+*.DS_Store*
