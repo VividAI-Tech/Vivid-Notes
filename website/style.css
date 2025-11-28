@@ -78,8 +78,8 @@ a {
 }
 
 .logo img {
-    width: 32px;
-    height: 32px;
+    width: 48px;
+    height: 48px;
 }
 
 .nav-links {
@@ -1089,6 +1089,12 @@ footer {
 
 .footer-col a:hover {
     color: var(--primary);
+}
+
+.footer-col .logo {
+    display: flex;
+    color: var(--text-light);
+    margin-bottom: 16px;
 }
 
 .copyright {

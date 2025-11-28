@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+
 <head>
   <title>VividAI Icon Generator</title>
   <style>
@@ -9,23 +10,34 @@
       background: #1E293B;
       color: #F8FAFC;
     }
-    h1 { margin-bottom: 20px; }
+
+    h1 {
+      margin-bottom: 20px;
+    }
+
     .icon-preview {
       display: flex;
       gap: 20px;
       margin: 20px 0;
       align-items: flex-end;
     }
+
     .icon-item {
       text-align: center;
     }
+
     .icon-item span {
       display: block;
       margin-top: 8px;
       font-size: 12px;
       color: #94A3B8;
     }
-    canvas { border: 1px solid #475569; border-radius: 8px; }
+
+    canvas {
+      border: 1px solid #475569;
+      border-radius: 8px;
+    }
+
     button {
       background: #F97316;
       color: white;
@@ -36,28 +48,35 @@
       cursor: pointer;
       margin-top: 20px;
     }
-    button:hover { background: #EA580C; }
+
+    button:hover {
+      background: #EA580C;
+    }
+
     .instructions {
       background: #334155;
       padding: 20px;
       border-radius: 8px;
       margin-top: 30px;
     }
+
     .instructions ol {
       margin-left: 20px;
     }
+
     .instructions li {
       margin: 8px 0;
     }
   </style>
 </head>
+
 <body>
   <h1>🎤 VividAI Icon Generator</h1>
   <p>Generate PNG icons for the browser extension</p>
-  
+
   <div class="icon-preview">
     <div class="icon-item">
-      <canvas id="icon16" width="16" height="16"></canvas>
+      <canvas id="icon48" width="16" height="16"></canvas>
       <span>16x16</span>
     </div>
     <div class="icon-item">
@@ -69,9 +88,9 @@
       <span>128x128</span>
     </div>
   </div>
-  
+
   <button onclick="downloadAll()">Download All Icons</button>
-  
+
   <div class="instructions">
     <h3>Instructions:</h3>
     <ol>
@@ -84,20 +103,20 @@
 
   <script>
     const sizes = [16, 48, 128];
-    
+
     function drawIcon(canvas, size) {
       const ctx = canvas.getContext('2d');
       const scale = size / 32;
-      
+
       // Clear canvas
       ctx.clearRect(0, 0, size, size);
-      
+
       // Draw blue circle
       ctx.fillStyle = '#1E40AF';
       ctx.beginPath();
       ctx.arc(16 * scale, 16 * scale, 14 * scale, 0, Math.PI * 2);
       ctx.fill();
-      
+
       // Draw orange play triangle
       ctx.fillStyle = '#F97316';
       ctx.beginPath();
@@ -107,13 +126,13 @@
       ctx.closePath();
       ctx.fill();
     }
-    
+
     // Draw all icons
     sizes.forEach(size => {
       const canvas = document.getElementById(`icon${size}`);
       drawIcon(canvas, size);
     });
-    
+
     function downloadAll() {
       sizes.forEach((size, index) => {
         setTimeout(() => {
@@ -125,7 +144,7 @@
         }, index * 500); // Stagger downloads
       });
     }
-    
+
     // Show path instructions
     function showInstructions() {
       const extensionPath = window.location.href.replace('tools/generate-icons.html', 'icons/');
@@ -139,4 +158,5 @@
     showInstructions();
   </script>
 </body>
+
 </html>
