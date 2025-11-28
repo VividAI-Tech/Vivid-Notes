@@ -2,6 +2,7 @@
   "manifest_version": 3,
   "name": "VividAI - Meeting Transcriber & Summarizer",
   "version": "1.0.0",
+  "homepage_url": "https://vividai.tech",
   "description": "Automatically transcribe and summarize meetings from Google Meet, Zoom, Webex, WhatsApp and more with AI-powered insights",
   "permissions": [
     "storage",
@@ -41,8 +42,12 @@
         "https://web.whatsapp.com/*",
         "https://teams.microsoft.com/*"
       ],
-      "js": ["content/content.js"],
-      "css": ["content/content.css"]
+      "js": [
+        "content/content.js"
+      ],
+      "css": [
+        "content/content.css"
+      ]
     }
   ],
   "options_page": "options/options.html",
@@ -53,8 +58,14 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["assets/*", "recorder/*", "bot/*"],
-      "matches": ["<all_urls>"]
+      "resources": [
+        "assets/*",
+        "recorder/*",
+        "bot/*"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
     }
   ]
 }

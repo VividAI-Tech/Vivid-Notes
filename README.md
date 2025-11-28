@@ -38,7 +38,7 @@ Unlike other meeting assistants that require bots to join your calls or store yo
 | **Privacy** | 🔒 **High** (Local Keys & Data) | ⚠️ Medium (Cloud Storage) |
 | **Bot Required** | ❌ **No** (Invisible Tab Capture) | ✅ Yes (Often Intrusive) |
 | **AI Model** | 🧠 **Flexible** (OpenAI, Gemini, Ollama) | 🔒 Fixed / Proprietary |
-| **Cost** | 💸 **At-Cost** (BYO Key / Free Local) | 💳 Monthly Subscription ($10-30/mo) |
+| **Cost** | 💸 **At-Cost** (Free $120/mo OpenAI Credits) | 💳 Monthly Subscription ($10-30/mo) |
 | **Offline AI** | ✅ **Yes** (Ollama Support) | ❌ No |
 
 ## 📦 Installation
@@ -64,7 +64,7 @@ Before you start, you'll need to configure your AI provider.
 2.  Click the **Settings (Gear)** icon.
 3.  Select your **AI Provider** (e.g., OpenAI, Gemini, Groq).
 4.  Enter your **API Key**.
-    - [Get OpenAI Key](https://platform.openai.com/api-keys)
+    - [Get OpenAI Key](https://platform.openai.com/api-keys) (OpenAI gives **$120/mo free credits**, enough for ~300 hours!)
     - [Get Gemini Key](https://aistudio.google.com/apikey)
     - [Get Groq Key](https://console.groq.com/keys)
 5.  Click **Save Settings** and **Test Connection**.
