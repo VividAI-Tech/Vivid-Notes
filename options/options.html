@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VividAI Settings</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="options.css">
+</head>
+
+<body>
+  <div class="container">
+    <header class="header">
+      <div class="logo">
+        <img src="../icons/icon48.png" alt="VividAI Logo" width="48" height="48">
+        <div>
+          <h1>VividAI</h1>
+          <p>Meeting Transcriber & Summarizer</p>
+        </div>
+      </div>
+    </header>
+
+    <main class="main">
+      <!-- AI Provider Section -->
+      <section class="section">
+        <h2>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path
+              d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4">
+            </path>
+          </svg>
+          AI Provider Configuration
+        </h2>
+        <p class="section-description">
+          Choose your AI provider and configure the connection. Supports OpenAI, Gemini, OpenRouter, Groq, FloTorch,
+          Ollama (local), and any OpenAI-compatible API.
+        </p>
+
+        <div class="form-group">
+          <label for="aiProvider">AI Provider</label>
+          <select id="aiProvider">
+            <option value="openai">OpenAI</option>
+            <option value="gemini">Google Gemini</option>
+            <option value="openrouter">OpenRouter</option>
+            <option value="groq">Groq</option>
+            <option value="flotorch">FloTorch</option>
+            <option value="ollama">Ollama (Local)</option>
+            <option value="custom">Custom (OpenAI-compatible)</option>
+          </select>
+        </div>
+
+        <div class="form-group" id="baseUrlGroup">
+          <label for="baseUrl">API Base URL</label>
+          <input type="text" id="baseUrl" placeholder="https://api.openai.com/v1" autocomplete="off">
+          <small class="hint" id="baseUrlHint">Leave empty for default OpenAI endpoint</small>
+        </div>
+
+        <div class="form-group" id="apiKeyGroup">
+          <label for="apiKey">API Key <span id="apiKeyOptional" style="display:none;">(Optional for
+              Ollama)</span></label>
+          <div class="input-wrapper">
+            <input type="password" id="apiKey" placeholder="sk-..." autocomplete="off">
+            <button type="button" class="toggle-visibility" id="toggleVisibility" title="Show/Hide">
+              <svg class="eye-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+              <svg class="eye-off-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2" style="display: none;">
+                <path
+                  d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24">
+                </path>
+                <line x1="1" y1="1" x2="23" y2="23"></line>
+              </svg>
+            </button>
+          </div>
+          <small class="hint" id="apiKeyHint">
+            Get your API key from <a href="https://platform.openai.com/api-keys" target="_blank">OpenAI Platform</a>
+          </small>
+        </div>
+
+        <div class="button-group">
+          <button class="btn btn-primary" id="saveApiKey">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+              <polyline points="17 21 17 13 7 13 7 21"></polyline>
+              <polyline points="7 3 7 8 15 8"></polyline>
+            </svg>
+            Save Settings
+          </button>
+          <button class="btn btn-secondary" id="testApiKey">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            Test Connection
+          </button>
+        </div>
+
+        <div class="status-message" id="apiStatus"></div>
+      </section>
+
+      <!-- Language Settings -->
+      <section class="section">
+        <h2>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="2" y1="12" x2="22" y2="12"></line>
+            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+          </svg>
+          Language Settings
+        </h2>
+        <p class="section-description">
+          Configure how transcripts handle multiple languages.
+        </p>
+
+        <div class="form-group">
+          <label for="defaultLanguage">Primary Transcript Language</label>
+          <select id="defaultLanguage">
+            <option value="auto">Auto-detect</option>
+            <option value="en">English</option>
+            <option value="es">Spanish</option>
+            <option value="fr">French</option>
+            <option value="de">German</option>
+            <option value="it">Italian</option>
+            <option value="pt">Portuguese</option>
+            <option value="nl">Dutch</option>
+            <option value="pl">Polish</option>
+            <option value="ru">Russian</option>
+            <option value="ja">Japanese</option>
+            <option value="ko">Korean</option>
+            <option value="zh">Chinese</option>
+            <option value="ar">Arabic</option>
+            <option value="hi">Hindi</option>
+            <option value="te">Telugu</option>
+            <option value="ta">Tamil</option>
+            <option value="bn">Bengali</option>
+          </select>
+        </div>
+
+        <div class="form-group checkbox-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="autoTranslate" checked>
+            <span class="checkmark"></span>
+            Automatically translate non-English content to English
+          </label>
+        </div>
+
+        <div class="form-group checkbox-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="showBothLanguages" checked>
+            <span class="checkmark"></span>
+            Show both original and translated text
+          </label>
+        </div>
+      </section>
+
+      <!-- Transcription Settings -->
+      <section class="section">
+        <h2>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+            <line x1="12" y1="19" x2="12" y2="23"></line>
+            <line x1="8" y1="23" x2="16" y2="23"></line>
+          </svg>
+          Transcription Settings
+        </h2>
+
+        <div class="form-group">
+          <label for="whisperModel">Whisper Model</label>
+          <select id="whisperModel">
+            <option value="whisper-1">Whisper-1 (Recommended)</option>
+          </select>
+          <small class="hint">OpenAI's Whisper model for speech-to-text</small>
+        </div>
+
+        <div class="form-group">
+          <label for="summaryModel">Summary Model</label>
+          <select id="summaryModel">
+            <option value="gpt-4o-mini">GPT-4o Mini (Fast & Affordable)</option>
+            <option value="gpt-4o">GPT-4o (Best Quality)</option>
+            <option value="gpt-4-turbo">GPT-4 Turbo</option>
+            <option value="gpt-3.5-turbo">GPT-3.5 Turbo (Fastest)</option>
+          </select>
+          <small class="hint">Model used for generating summaries and extracting tasks</small>
+        </div>
+      </section>
+
+      <!-- Export Settings -->
+      <section class="section">
+        <h2>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          Export Settings
+        </h2>
+
+        <div class="form-group">
+          <label for="exportFormat">Default Export Format</label>
+          <select id="exportFormat">
+            <option value="json">JSON</option>
+            <option value="txt">Plain Text</option>
+            <option value="markdown">Markdown</option>
+          </select>
+        </div>
+
+        <div class="form-group checkbox-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="includeTimestamps" checked>
+            <span class="checkmark"></span>
+            Include timestamps in exports
+          </label>
+        </div>
+
+        <div class="form-group checkbox-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="includeSpeakerNames" checked>
+            <span class="checkmark"></span>
+            Include speaker names in exports
+          </label>
+        </div>
+      </section>
+
+      <!-- Data Management -->
+      <section class="section">
+        <h2>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+          </svg>
+          Data Management
+        </h2>
+        <p class="section-description">
+          Manage your stored data and settings.
+        </p>
+
+        <div class="button-group">
+          <button class="btn btn-secondary" id="exportSettings">
+            Export Settings
+          </button>
+          <button class="btn btn-secondary" id="importSettings">
+            Import Settings
+          </button>
+          <button class="btn btn-danger" id="clearData">
+            Clear All Data
+          </button>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>VividAI v1.0.0 • Made with ❤️ for productive meetings</p>
+    </footer>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+
+</html>

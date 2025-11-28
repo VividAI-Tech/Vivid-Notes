@@ -1,0 +1,98 @@
+/* FlyRec Content Script Styles */
+
+#flyrec-indicator {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 999999;
+  background: linear-gradient(135deg, #1E3A8A, #1E40AF);
+  border: 2px solid #3B82F6;
+  border-radius: 24px;
+  padding: 8px 16px;
+  box-shadow: 0 4px 20px rgba(30, 64, 175, 0.4);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  user-select: none;
+}
+
+#flyrec-indicator:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(30, 64, 175, 0.5);
+}
+
+#flyrec-indicator.active {
+  background: linear-gradient(135deg, #EA580C, #F97316);
+  border-color: #FB923C;
+  box-shadow: 0 4px 20px rgba(249, 115, 22, 0.4);
+  animation: pulse-indicator 2s infinite;
+}
+
+@keyframes pulse-indicator {
+  0%, 100% {
+    box-shadow: 0 4px 20px rgba(249, 115, 22, 0.4);
+  }
+  50% {
+    box-shadow: 0 4px 30px rgba(249, 115, 22, 0.6);
+  }
+}
+
+#flyrec-indicator.recording {
+  background: linear-gradient(135deg, #DC2626, #EF4444);
+  border-color: #F87171;
+  animation: recording-pulse 1.5s infinite;
+}
+
+@keyframes recording-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+  }
+}
+
+.flyrec-indicator-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.flyrec-indicator-content svg {
+  flex-shrink: 0;
+}
+
+.flyrec-indicator-content span {
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Hide indicator when minimized */
+#flyrec-indicator.minimized {
+  padding: 8px;
+  border-radius: 50%;
+}
+
+#flyrec-indicator.minimized .flyrec-indicator-content span {
+  display: none;
+}
+
+/* Recording badge */
+#flyrec-indicator .recording-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 12px;
+  height: 12px;
+  background: #EF4444;
+  border-radius: 50%;
+  border: 2px solid white;
+  animation: blink 1s infinite;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}

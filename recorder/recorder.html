@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VividAI Recorder</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: linear-gradient(135deg, #1E3A8A, #0F172A);
+      color: #F8FAFC;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .container {
+      text-align: center;
+      max-width: 400px;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .logo h1 {
+      font-size: 24px;
+      background: linear-gradient(135deg, #3B82F6, #F97316);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .status {
+      font-size: 14px;
+      color: #94A3B8;
+      margin-bottom: 16px;
+    }
+
+    .status.recording {
+      color: #F97316;
+    }
+
+    .timer {
+      font-size: 48px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      margin-bottom: 24px;
+      text-shadow: 0 0 30px rgba(249, 115, 22, 0.5);
+    }
+
+    .timer.recording {
+      color: #F97316;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.7;
+      }
+    }
+
+    .controls {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      margin-bottom: 24px;
+    }
+
+    button {
+      padding: 12px 24px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .start-btn {
+      background: linear-gradient(135deg, #F97316, #EA580C);
+      color: white;
+    }
+
+    .start-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 20px rgba(249, 115, 22, 0.4);
+    }
+
+    .stop-btn {
+      background: #334155;
+      color: white;
+      border: 1px solid #475569;
+    }
+
+    .stop-btn:hover {
+      background: #EF4444;
+      border-color: #EF4444;
+    }
+
+    .stop-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .info {
+      font-size: 12px;
+      color: #64748B;
+      background: #1E293B;
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid #334155;
+    }
+
+    .recording-indicator {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .recording-indicator.active {
+      display: flex;
+      justify-content: center;
+    }
+
+    .rec-dot {
+      width: 12px;
+      height: 12px;
+      background: #EF4444;
+      border-radius: 50%;
+      animation: blink 1s infinite;
+    }
+
+    @keyframes blink {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.3;
+      }
+    }
+
+    .audio-level-container {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+      padding: 8px 16px;
+      background: rgba(30, 41, 59, 0.8);
+      border-radius: 8px;
+      font-size: 12px;
+    }
+
+    .audio-label {
+      color: #94A3B8;
+    }
+
+    .audio-meter {
+      flex: 1;
+      height: 8px;
+      background: #1E293B;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .audio-meter-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #22C55E, #F97316);
+      border-radius: 4px;
+      transition: width 0.1s ease;
+    }
+
+    .audio-status {
+      font-size: 11px;
+      min-width: 60px;
+    }
+
+    .audio-status.good {
+      color: #22C55E;
+    }
+
+    .audio-status.low {
+      color: #F97316;
+    }
+
+    .audio-status.none {
+      color: #EF4444;
+    }
+
+    .mic-fallback-btn {
+      background: #F97316;
+      border: none;
+      border-radius: 4px;
+      padding: 4px 8px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.2s;
+    }
+
+    .mic-fallback-btn:hover {
+      background: #EA580C;
+      transform: scale(1.1);
+    }
+
+    .mic-fallback-btn.active {
+      background: #22C55E;
+    }
+
+    /* Toggle Options */
+    .toggle-options {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 16px;
+      padding: 12px 16px;
+      background: rgba(30, 41, 59, 0.8);
+      border-radius: 8px;
+    }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .toggle-label {
+      font-size: 13px;
+      color: #94A3B8;
+    }
+
+    .toggle {
+      position: relative;
+      width: 44px;
+      height: 24px;
+    }
+
+    .toggle input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: #475569;
+      border-radius: 24px;
+      transition: 0.3s;
+    }
+
+    .toggle-slider:before {
+      position: absolute;
+      content: "";
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 3px;
+      background: white;
+      border-radius: 50%;
+      transition: 0.3s;
+    }
+
+    .toggle input:checked + .toggle-slider {
+      background: linear-gradient(135deg, #3B82F6, #1E40AF);
+    }
+
+    .toggle input:checked + .toggle-slider:before {
+      transform: translateX(20px);
+    }
+
+    .transcript-time {
+      font-size: 10px;
+      color: #64748B;
+      margin-right: 8px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <div class="logo">
+      <img src="../icons/icon48.png" alt="VividAI Logo" width="40" height="40">
+      <h1>VividAI</h1>
+    </div>
+
+    <div class="recording-indicator" id="recordingIndicator">
+      <div class="rec-dot"></div>
+      <span>Recording in progress</span>
+    </div>
+
+    <div class="toggle-options">
+      <div class="toggle-row">
+        <span class="toggle-label">Record Screen</span>
+        <label class="toggle">
+          <input type="checkbox" id="recordScreenToggle">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <div class="audio-level-container" id="audioLevelContainer" style="display: none;">
+      <span class="audio-label">Audio Level:</span>
+      <div class="audio-meter">
+        <div class="audio-meter-bar" id="audioMeterBar"></div>
+      </div>
+      <span class="audio-status" id="audioStatus">Detecting...</span>
+      <button class="mic-fallback-btn" id="micFallbackBtn" title="Switch to microphone" style="display: none;">🎤</button>
+    </div>
+
+    <div class="status" id="status">Ready to record</div>
+    <div class="timer" id="timer">00:00:00</div>
+
+    <div class="controls">
+      <button class="start-btn" id="startBtn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+          <circle cx="12" cy="12" r="8" />
+        </svg>
+        Start Recording
+      </button>
+      <button class="stop-btn" id="stopBtn" disabled>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+          <rect x="6" y="6" width="12" height="12" />
+        </svg>
+        Stop & Process
+      </button>
+    </div>
+
+    <div class="info" id="infoBox">
+      <strong>📋 How to Record:</strong><br>
+      1. Click "Start Recording"<br>
+      2. Allow microphone access when prompted<br>
+      3. Speak or place mic near speakers<br>
+      🖥️ Enable "Record Screen" for video capture
+    </div>
+  </div>
+
+  <script src="recorder.js"></script>
+</body>
+
+</html>
