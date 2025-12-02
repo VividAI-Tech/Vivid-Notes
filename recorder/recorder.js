@@ -1,6 +1,19 @@
 // VividAI Recorder Window Script
 // Handles persistent recording in a separate window
 
+// Default API endpoints
+const DEFAULT_BASE_URL = 'https://api.openai.com/v1';
+
+// Pricing (approximate, for cost estimation)
+const PRICING = {
+  'whisper-1': 0.006, // per minute of audio
+  'gpt-4o-mini': { input: 0.00015, output: 0.0006 }, // per 1K tokens
+  'gpt-4o': { input: 0.005, output: 0.015 },
+  'gpt-4-turbo': { input: 0.01, output: 0.03 },
+  'gpt-3.5-turbo': { input: 0.0005, output: 0.0015 },
+  'default': { input: 0.001, output: 0.002 }
+};
+
 let mediaRecorder = null;
 let mediaStream = null;
 let audioChunks = [];
@@ -267,13 +280,9 @@ async function processRecording() {
     
     const mimeType = mediaRecorder?.mimeType || 'audio/webm';
     const audioBlob = new Blob(audioChunks, { type: mimeType });
-    const base64Audio = await blobToBase64(audioBlob);
     
-    const transcriptResponse = await chrome.runtime.sendMessage({
-      action: 'transcribeAudio',
-      audioData: base64Audio,
-      audioDuration: elapsedSeconds
-    });
+    // Transcribe directly from recorder page to avoid message size limits
+    const transcriptResponse = await transcribeAudioDirectly(audioBlob, elapsedSeconds);
     
     if (!transcriptResponse.success) {
       status.textContent = 'Transcription failed: ' + transcriptResponse.error;
@@ -309,10 +318,8 @@ async function processRecording() {
     
     status.textContent = 'Generating summary...';
     
-    const summaryResponse = await chrome.runtime.sendMessage({
-      action: 'generateSummary',
-      transcript: finalTranscript
-    });
+    // Generate summary directly from recorder page
+    const summaryResponse = await generateSummaryDirectly(finalTranscript);
     
     console.log('Summary received:', summaryResponse);
     
@@ -638,6 +645,261 @@ function blobToBase64(blob) {
     reader.onerror = reject;
     reader.readAsDataURL(blob);
   });
+}
+
+// Get API configuration from storage
+async function getApiConfig() {
+  const settings = await chrome.storage.local.get(['ai_provider', 'api_base_url', 'openai_api_key']);
+  return {
+    provider: settings.ai_provider || 'openai',
+    baseUrl: settings.api_base_url || DEFAULT_BASE_URL,
+    apiKey: settings.openai_api_key || ''
+  };
+}
+
+// Transcribe audio directly without message passing (avoids size limits)
+async function transcribeAudioDirectly(audioBlob, audioDuration = 0) {
+  try {
+    const config = await getApiConfig();
+    if (!config.apiKey && config.provider !== 'ollama') {
+      return { success: false, error: 'API key not configured. Please set it in Settings.' };
+    }
+    
+    // Create form data for Whisper API
+    const formData = new FormData();
+    formData.append('file', audioBlob, 'recording.webm');
+    formData.append('model', 'whisper-1');
+    formData.append('response_format', 'verbose_json');
+    formData.append('timestamp_granularities[]', 'segment');
+    
+    // Whisper API endpoint
+    const whisperBaseUrl = config.provider === 'openai' || config.baseUrl.includes('openai.com') 
+      ? config.baseUrl 
+      : 'https://api.openai.com/v1';
+    
+    const headers = {};
+    if (config.apiKey) {
+      headers['Authorization'] = `Bearer ${config.apiKey}`;
+    }
+    
+    const response = await fetch(`${whisperBaseUrl}/audio/transcriptions`, {
+      method: 'POST',
+      headers: headers,
+      body: formData
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error?.message || 'Transcription failed');
+    }
+    
+    const result = await response.json();
+    
+    // Calculate Whisper cost
+    const durationMinutes = (result.duration || audioDuration) / 60;
+    const whisperCost = durationMinutes * PRICING['whisper-1'];
+    
+    // Process transcription with speaker detection
+    const { transcript, translationCost } = await processTranscription(result, config);
+    
+    return { 
+      success: true, 
+      transcript,
+      cost: {
+        whisper: whisperCost,
+        translation: translationCost,
+        total: whisperCost + translationCost
+      },
+      duration: result.duration || audioDuration,
+      language: result.language
+    };
+  } catch (error) {
+    console.error('Transcription error:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+// Process transcription with speaker detection
+async function processTranscription(whisperResult, config) {
+  const segments = whisperResult.segments || [];
+  const detectedLanguage = whisperResult.language || 'en';
+  
+  const transcript = [];
+  let translationCost = 0;
+  
+  for (let i = 0; i < segments.length; i++) {
+    const segment = segments[i];
+    const entry = {
+      text: segment.text.trim(),
+      timestamp: formatTimestamp(segment.start),
+      startTime: segment.start,
+      endTime: segment.end,
+      language: detectedLanguage,
+      speaker: detectSpeaker(segment, i)
+    };
+    
+    // Translate if not English
+    if (detectedLanguage !== 'en') {
+      const { translation, cost } = await translateText(segment.text, detectedLanguage, config);
+      entry.translation = translation;
+      translationCost += cost;
+    }
+    
+    transcript.push(entry);
+  }
+  
+  return { transcript, translationCost };
+}
+
+// Simple speaker detection (heuristic)
+function detectSpeaker(segment, index) {
+  const speakers = ['Speaker 1', 'Speaker 2', 'Speaker 3', 'Speaker 4'];
+  return speakers[index % speakers.length];
+}
+
+// Translate text if needed
+async function translateText(text, sourceLanguage, config) {
+  try {
+    const headers = { 'Content-Type': 'application/json' };
+    if (config.apiKey) {
+      headers['Authorization'] = `Bearer ${config.apiKey}`;
+    }
+    
+    const response = await fetch(`${config.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: `You are a translator. Translate the following text from ${sourceLanguage} to English. Only output the translation, nothing else.`
+          },
+          {
+            role: 'user',
+            content: text
+          }
+        ],
+        temperature: 0.3
+      })
+    });
+    
+    if (!response.ok) {
+      throw new Error('Translation failed');
+    }
+    
+    const result = await response.json();
+    const inputTokens = result.usage?.prompt_tokens || 0;
+    const outputTokens = result.usage?.completion_tokens || 0;
+    const pricing = PRICING['gpt-4o-mini'] || PRICING['default'];
+    const cost = (inputTokens / 1000 * pricing.input) + (outputTokens / 1000 * pricing.output);
+    
+    return { 
+      translation: result.choices[0].message.content.trim(),
+      cost 
+    };
+  } catch (error) {
+    console.error('Translation error:', error);
+    return { translation: null, cost: 0 };
+  }
+}
+
+// Format timestamp
+function formatTimestamp(seconds) {
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+}
+
+// Generate summary directly without message passing
+async function generateSummaryDirectly(transcript) {
+  try {
+    const config = await getApiConfig();
+    if (!config.apiKey && config.provider !== 'ollama') {
+      return { success: false, error: 'API key not configured. Please set it in Settings.' };
+    }
+    
+    const settings = await chrome.storage.local.get('summary_model');
+    const model = settings.summary_model || 'gpt-4o-mini';
+    
+    // Prepare transcript text
+    let transcriptText;
+    if (typeof transcript === 'string') {
+      transcriptText = transcript;
+    } else if (Array.isArray(transcript)) {
+      transcriptText = transcript.map(entry => 
+        entry.speaker ? `${entry.speaker}: ${entry.text}` : entry.text
+      ).join('\n');
+    } else {
+      transcriptText = String(transcript);
+    }
+    
+    const headers = { 'Content-Type': 'application/json' };
+    if (config.apiKey) {
+      headers['Authorization'] = `Bearer ${config.apiKey}`;
+    }
+    
+    const response = await fetch(`${config.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify({
+        model: model,
+        messages: [
+          {
+            role: 'system',
+            content: `You are a meeting assistant that analyzes meeting transcripts. 
+            Provide a structured analysis in JSON format with the following fields:
+            - title: A short, descriptive title for the meeting (max 6 words)
+            - category: One of: "Work Meeting", "Interview", "Lecture", "Podcast", "Personal", "Call", "Presentation", "Brainstorm", "Other"
+            - tags: An array of 2-5 relevant tags/keywords
+            - overview: A brief 2-3 sentence summary
+            - keyPoints: An array of key discussion points (max 5)
+            - decisions: An array of decisions made
+            - nextSteps: An array of agreed next steps
+            
+            Only include fields that have actual content. Be concise and actionable.`
+          },
+          {
+            role: 'user',
+            content: `Please analyze this meeting transcript:\n\n${transcriptText}`
+          }
+        ],
+        temperature: 0.5,
+        response_format: { type: 'json_object' }
+      })
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error?.message || 'Summary generation failed');
+    }
+    
+    const result = await response.json();
+    const analysis = JSON.parse(result.choices[0].message.content);
+    
+    // Calculate cost
+    const inputTokens = result.usage?.prompt_tokens || 0;
+    const outputTokens = result.usage?.completion_tokens || 0;
+    const pricing = PRICING[model] || PRICING['default'];
+    const summaryCost = (inputTokens / 1000 * pricing.input) + (outputTokens / 1000 * pricing.output);
+    
+    return {
+      success: true,
+      title: analysis.title || 'Meeting Recording',
+      category: analysis.category || 'Other',
+      tags: analysis.tags || [],
+      summary: {
+        overview: analysis.overview,
+        keyPoints: analysis.keyPoints || [],
+        decisions: analysis.decisions || [],
+        nextSteps: analysis.nextSteps || []
+      },
+      cost: summaryCost
+    };
+  } catch (error) {
+    console.error('Summary generation error:', error);
+    return { success: false, error: error.message };
+  }
 }
 
 // Check if we should resume recording on page load
