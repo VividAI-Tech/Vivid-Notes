@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  whisper:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: faster-whisper-server
+    ports:
+      - "5001:5000"
+    volumes:
+      # Mount for persistent model cache
+      - ./models:/app/models
+      # Mount for audio files (optional)
+      - ./audio:/app/audio
+    environment:
+      - WHISPER_MODEL=distil-large-v3
+      - PYTORCH_ENABLE_MPS_FALLBACK=1
+      - OMP_NUM_THREADS=8
+      - MKL_NUM_THREADS=8
+      - OPENBLAS_NUM_THREADS=8
+      - CT2_USE_EXPERIMENTAL_PACKED_GEMM=1
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import requests; requests.get('http://localhost:5000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    # For macOS with Apple Silicon, we use CPU optimization
+    # Docker Desktop for Mac doesn't expose GPU directly to containers
+    deploy:
+      resources:
+        limits:
+          cpus: '8'
+          memory: 16G
+        reservations:
+          cpus: '4'
+          memory: 8G

@@ -93,10 +93,27 @@ class MeetingDetector {
   }
   
   notifyPlatformDetected() {
-    chrome.runtime.sendMessage({
+    this.safeSendMessage({
       action: 'platformDetected',
       platform: this.platform
     });
+  }
+  
+  // Safely send messages to handle extension context invalidation
+  safeSendMessage(message, callback) {
+    try {
+      if (chrome.runtime?.id) {
+        chrome.runtime.sendMessage(message, (response) => {
+          if (chrome.runtime.lastError) {
+            console.log('Extension context invalidated, ignoring:', chrome.runtime.lastError.message);
+          } else if (callback) {
+            callback(response);
+          }
+        });
+      }
+    } catch (error) {
+      console.log('Extension context invalidated:', error.message);
+    }
   }
   
   startMonitoring() {
@@ -173,7 +190,7 @@ class MeetingDetector {
     
     if (JSON.stringify(participants) !== JSON.stringify(this.participants)) {
       this.participants = participants;
-      chrome.runtime.sendMessage({
+      this.safeSendMessage({
         action: 'participantsUpdate',
         participants: this.participants
       });
@@ -181,7 +198,7 @@ class MeetingDetector {
   }
   
   notifyMeetingStatus() {
-    chrome.runtime.sendMessage({
+    this.safeSendMessage({
       action: 'meetingStatus',
       isActive: this.isMeetingActive,
       platform: this.platform.name
@@ -189,7 +206,7 @@ class MeetingDetector {
     
     // Notify bot about meeting status change
     if (this.isMeetingActive) {
-      chrome.runtime.sendMessage({
+      this.safeSendMessage({
         action: 'botMeetingActive',
         platform: this.platform.name,
         url: window.location.href,
@@ -197,7 +214,7 @@ class MeetingDetector {
       });
     } else {
       // Meeting ended - notify bot
-      chrome.runtime.sendMessage({
+      this.safeSendMessage({
         action: 'botMeetingEnded',
         platform: this.platform.name,
         url: window.location.href

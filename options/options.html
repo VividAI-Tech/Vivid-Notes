@@ -169,13 +169,83 @@
           </svg>
           Transcription Settings
         </h2>
+        <p class="section-description">
+          Configure speech-to-text transcription. Only OpenAI and Groq have Whisper API.
+        </p>
+
+        <div class="form-group">
+          <label for="transcriptionProvider">Transcription Provider</label>
+          <select id="transcriptionProvider">
+            <option value="openai">OpenAI ($0.006/min)</option>
+            <option value="groq">Groq ($0.02/hr - 18x cheaper!)</option>
+            <option value="local">Local Whisper</option>
+          </select>
+          <small class="hint" id="transcriptionProviderHint">Groq offers significantly cheaper transcription with same quality</small>
+        </div>
+
+        <div class="form-group" id="transcriptionApiKeyGroup" style="display: none;">
+          <label for="transcriptionApiKey">Transcription API Key</label>
+          <div class="input-wrapper">
+            <input type="password" id="transcriptionApiKey" placeholder="API key for transcription" autocomplete="off">
+            <button type="button" class="toggle-visibility" id="toggleTranscriptionKey" title="Show/Hide">
+              <svg class="eye-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+            </button>
+          </div>
+          <small class="hint" id="transcriptionApiKeyHint">Leave empty to use the main API key above</small>
+        </div>
 
         <div class="form-group">
           <label for="whisperModel">Whisper Model</label>
           <select id="whisperModel">
-            <option value="whisper-1">Whisper-1 (Recommended)</option>
+            <option value="whisper-1">Whisper-1 (OpenAI)</option>
           </select>
-          <small class="hint">OpenAI's Whisper model for speech-to-text</small>
+          <small class="hint" id="whisperModelHint">Speech-to-text model</small>
+        </div>
+      </section>
+
+      <!-- Summary Settings -->
+      <section class="section">
+        <h2>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+          </svg>
+          Summary Settings
+        </h2>
+        <p class="section-description">
+          Configure AI provider and model for generating summaries.
+        </p>
+
+        <div class="form-group">
+          <label for="summaryProvider">Summary Provider</label>
+          <select id="summaryProvider">
+            <option value="same">Same as main AI provider</option>
+            <option value="openai">OpenAI</option>
+            <option value="gemini">Google Gemini</option>
+            <option value="groq">Groq (Fast & Free tier)</option>
+            <option value="openrouter">OpenRouter</option>
+            <option value="ollama">Ollama (Local)</option>
+          </select>
+          <small class="hint" id="summaryProviderHint">Use a different provider for summaries if needed</small>
+        </div>
+
+        <div class="form-group" id="summaryApiKeyGroup" style="display: none;">
+          <label for="summaryApiKey">Summary API Key</label>
+          <div class="input-wrapper">
+            <input type="password" id="summaryApiKey" placeholder="API key for summary" autocomplete="off">
+            <button type="button" class="toggle-visibility" id="toggleSummaryKey" title="Show/Hide">
+              <svg class="eye-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+            </button>
+          </div>
+          <small class="hint">Leave empty to use the main API key</small>
         </div>
 
         <div class="form-group">
@@ -183,10 +253,9 @@
           <select id="summaryModel">
             <option value="gpt-4o-mini">GPT-4o Mini (Fast & Affordable)</option>
             <option value="gpt-4o">GPT-4o (Best Quality)</option>
-            <option value="gpt-4-turbo">GPT-4 Turbo</option>
             <option value="gpt-3.5-turbo">GPT-3.5 Turbo (Fastest)</option>
           </select>
-          <small class="hint">Model used for generating summaries and extracting tasks</small>
+          <small class="hint" id="summaryModelHint">Model used for generating summaries</small>
         </div>
       </section>
 

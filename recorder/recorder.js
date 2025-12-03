@@ -25,6 +25,16 @@ let analyser = null;
 let audioMonitorInterval = null;
 let audioPlaybackElement = null;
 
+// Live transcription state
+let liveTranscript = [];          // Accumulated transcript entries
+let pendingChunks = [];           // Audio chunks waiting to be transcribed
+let transcriptionInterval = null; // Interval for periodic transcription
+let isTranscribing = false;       // Flag to prevent concurrent transcriptions
+let chunkStartTime = 0;           // Track when the current chunk started
+let lastTranscribedTime = 0;      // Track last transcribed audio time (seconds)
+const TRANSCRIPTION_INTERVAL_MS = 5000; // Transcribe every 5 seconds for faster live transcription
+let totalTranscriptionCost = 0;   // Track transcription cost
+
 // Elements
 const startBtn = document.getElementById('startBtn');
 const stopBtn = document.getElementById('stopBtn');
@@ -36,6 +46,13 @@ const audioMeterBar = document.getElementById('audioMeterBar');
 const audioStatus = document.getElementById('audioStatus');
 const micFallbackBtn = document.getElementById('micFallbackBtn');
 const recordScreenToggle = document.getElementById('recordScreenToggle');
+
+// Live transcript UI elements
+const liveTranscriptContainer = document.getElementById('liveTranscriptContainer');
+const transcriptContent = document.getElementById('transcriptContent');
+const transcriptCount = document.getElementById('transcriptCount');
+const transcriptProcessing = document.getElementById('transcriptProcessing');
+const emptyTranscript = document.getElementById('emptyTranscript');
 
 // Screen recording state
 let recordScreenEnabled = false;
@@ -161,6 +178,7 @@ async function startRecording() {
     mediaRecorder.ondataavailable = (event) => {
       if (event.data.size > 0) {
         audioChunks.push(event.data);
+        pendingChunks.push(event.data);
       }
     };
     
@@ -177,6 +195,30 @@ async function startRecording() {
         }
       };
     });
+    
+    // Reset live transcription state
+    liveTranscript = [];
+    pendingChunks = [];
+    totalTranscriptionCost = 0;
+    chunkStartTime = 0;
+    lastTranscribedTime = 0;
+    
+    // Show live transcript container
+    console.log('Setting up live transcript container:', liveTranscriptContainer);
+    if (liveTranscriptContainer) {
+      liveTranscriptContainer.style.display = 'block';
+      transcriptContent.innerHTML = '<div class="empty-transcript" id="emptyTranscript">Listening for speech...</div>';
+      transcriptCount.textContent = '0 segments';
+    } else {
+      console.error('Live transcript container not found!');
+    }
+    
+    // Start periodic live transcription (every 30 seconds)
+    console.log('Starting live transcription interval:', TRANSCRIPTION_INTERVAL_MS, 'ms');
+    transcriptionInterval = setInterval(async () => {
+      console.log('Transcription interval triggered, pending chunks:', pendingChunks.length);
+      await transcribePendingChunks();
+    }, TRANSCRIPTION_INTERVAL_MS);
     
     // Start recording
     mediaRecorder.start(1000);
@@ -225,6 +267,18 @@ async function stopRecording() {
   // Stop timer
   clearInterval(timerInterval);
   
+  // Stop live transcription interval
+  if (transcriptionInterval) {
+    clearInterval(transcriptionInterval);
+    transcriptionInterval = null;
+  }
+  
+  // Process any remaining pending chunks before final processing
+  if (pendingChunks.length > 0 && !isTranscribing) {
+    status.textContent = 'Transcribing final segment...';
+    await transcribePendingChunks();
+  }
+  
   // Stop audio monitoring and playback
   stopAudioMonitoring();
   stopAudioPlayback();
@@ -249,7 +303,7 @@ async function stopRecording() {
 
 async function processRecording() {
   try {
-    if (audioChunks.length === 0) {
+    if (audioChunks.length === 0 && liveTranscript.length === 0) {
       status.textContent = 'No audio recorded';
       resetUI();
       return;
@@ -271,36 +325,20 @@ async function processRecording() {
       document.body.removeChild(a);
       URL.revokeObjectURL(videoUrl);
       
-      status.textContent = 'Video saved! Now processing audio...';
+      status.textContent = 'Video saved! Now processing...';
     }
-    
-    status.textContent = 'Transcribing with AI...';
     
     const elapsedSeconds = startTime ? Math.floor((Date.now() - startTime) / 1000) : 0;
     
-    const mimeType = mediaRecorder?.mimeType || 'audio/webm';
-    const audioBlob = new Blob(audioChunks, { type: mimeType });
+    // Use accumulated live transcript instead of re-transcribing
+    // This avoids the long audio file issue and provides immediate results
+    const transcriptData = liveTranscript;
+    const transcriptCost = totalTranscriptionCost;
     
-    // Transcribe directly from recorder page to avoid message size limits
-    const transcriptResponse = await transcribeAudioDirectly(audioBlob, elapsedSeconds);
+    console.log('Using live transcript:', transcriptData.length, 'segments');
     
-    if (!transcriptResponse.success) {
-      status.textContent = 'Transcription failed: ' + transcriptResponse.error;
-      resetUI();
-      return;
-    }
-    
-    const transcriptData = transcriptResponse.transcript;
-    const transcriptCost = transcriptResponse.cost?.total || 0;
-    
-    console.log('Final transcript:', transcriptData);
-    
-    // Check if transcript is empty (handle both array and string formats)
-    const isEmpty = Array.isArray(transcriptData) 
-      ? transcriptData.length === 0 
-      : (!transcriptData || transcriptData.trim().length === 0);
-    
-    if (isEmpty) {
+    // Check if transcript is empty
+    if (transcriptData.length === 0) {
       status.textContent = 'No speech detected in audio';
       await chrome.storage.session.set({
         isRecording: false,
@@ -311,10 +349,10 @@ async function processRecording() {
       return;
     }
     
-    // Convert array to text for summary generation if needed
-    const finalTranscript = Array.isArray(transcriptData) 
-      ? transcriptData.map(t => t.text).join(' ')
-      : transcriptData;
+    // Convert array to text for summary generation
+    const finalTranscript = transcriptData.map(t => 
+      t.speaker ? `${t.speaker}: ${t.text}` : t.text
+    ).join('\n');
     
     status.textContent = 'Generating summary...';
     
@@ -345,7 +383,7 @@ async function processRecording() {
         category: category,
         tags: tags,
         totalCost: totalCost,
-        language: transcriptResponse.language || 'auto'
+        language: 'auto'
       }
     });
     
@@ -415,6 +453,226 @@ function resetUI() {
   
   // Reset screen recording state
   screenStream = null;
+  
+  // Hide live transcript container after a delay to show final state
+  setTimeout(() => {
+    if (!isRecording && liveTranscriptContainer) {
+      liveTranscriptContainer.style.display = 'none';
+    }
+  }, 5000);
+}
+
+// Transcribe pending audio chunks for live transcription
+async function transcribePendingChunks() {
+  if (isTranscribing || pendingChunks.length === 0) {
+    return;
+  }
+  
+  isTranscribing = true;
+  
+  // Show processing indicator
+  if (transcriptProcessing) {
+    transcriptProcessing.style.display = 'flex';
+  }
+  
+  try {
+    const config = await getTranscriptionConfig();
+    console.log('Transcription config:', { provider: config.provider, hasKey: !!config.apiKey, baseUrl: config.baseUrl, model: config.model });
+    
+    // Local provider doesn't need API key
+    if (!config.apiKey && config.provider !== 'local') {
+      console.error('API key not configured for transcription');
+      if (transcriptContent) {
+        transcriptContent.innerHTML = '<div class="empty-transcript" style="color: #F97316;">Please configure your API key in Settings</div>';
+      }
+      isTranscribing = false;
+      if (transcriptProcessing) transcriptProcessing.style.display = 'none';
+      return;
+    }
+    
+    // Use ALL audioChunks to create a complete WebM file with proper headers
+    // This is necessary because WebM container format needs the header from the first chunk
+    const mimeType = mediaRecorder?.mimeType || 'audio/webm';
+    const audioBlob = new Blob(audioChunks, { type: mimeType });
+    
+    // Clear pending chunks (we use audioChunks for the complete file)
+    pendingChunks = [];
+    
+    console.log('Total audio chunks:', audioChunks.length, 'Total size:', audioBlob.size);
+    
+    // Only process if blob has meaningful size (at least 1KB)
+    if (audioBlob.size < 1000) {
+      console.log('Audio too small:', audioBlob.size, 'bytes, skipping');
+      isTranscribing = false;
+      if (transcriptProcessing) transcriptProcessing.style.display = 'none';
+      return;
+    }
+    
+    console.log('Transcribing complete audio:', audioBlob.size, 'bytes, mimeType:', mimeType, 'provider:', config.provider, 'lastTranscribedTime:', lastTranscribedTime);
+    
+    let response;
+    
+    if (config.provider === 'local') {
+      // Local faster-whisper server uses different API format
+      const formData = new FormData();
+      formData.append('audio', audioBlob, 'chunk.webm');
+      if (config.model) {
+        formData.append('model', config.model);
+      }
+      
+      response = await fetch(`${config.baseUrl}/transcribe`, {
+        method: 'POST',
+        body: formData
+      });
+    } else {
+      // OpenAI/Groq API format
+      const formData = new FormData();
+      formData.append('file', audioBlob, 'chunk.webm');
+      formData.append('model', config.model);
+      formData.append('response_format', 'verbose_json');
+      formData.append('timestamp_granularities[]', 'segment');
+      
+      const headers = {
+        'Authorization': `Bearer ${config.apiKey}`
+      };
+      
+      response = await fetch(`${config.baseUrl}/audio/transcriptions`, {
+        method: 'POST',
+        headers: headers,
+        body: formData
+      });
+    }
+    
+    if (!response.ok) {
+      let errorMsg = `HTTP ${response.status}`;
+      try {
+        const error = await response.json();
+        errorMsg = error.error?.message || JSON.stringify(error);
+        console.error('Transcription error:', errorMsg, error);
+      } catch (e) {
+        const text = await response.text();
+        errorMsg = text || response.statusText;
+        console.error('Transcription error:', errorMsg);
+      }
+      // Show error in UI
+      if (transcriptContent) {
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'transcript-entry';
+        errorDiv.innerHTML = `<div class="transcript-text" style="color: #EF4444;">Transcription error: ${errorMsg}</div>`;
+        transcriptContent.appendChild(errorDiv);
+      }
+      isTranscribing = false;
+      if (transcriptProcessing) transcriptProcessing.style.display = 'none';
+      return;
+    }
+    
+    const result = await response.json();
+    
+    // Calculate cost for this chunk (local is free)
+    if (config.provider !== 'local') {
+      const durationMinutes = (result.duration || 30) / 60;
+      const chunkCost = durationMinutes * PRICING['whisper-1'];
+      totalTranscriptionCost += chunkCost;
+    }
+    
+    // Process segments and add to live transcript
+    // Since we transcribe complete audio each time, replace liveTranscript with all segments
+    const segments = result.segments || [];
+    
+    // Clear existing transcript and rebuild from complete transcription
+    liveTranscript = [];
+    
+    if (segments.length === 0 && result.text) {
+      // No segments but has text - create a single entry
+      const entry = {
+        text: result.text.trim(),
+        timestamp: formatTimestamp(0),
+        startTime: 0,
+        endTime: result.duration || 0,
+        language: result.language || 'en'
+      };
+      if (entry.text) {
+        liveTranscript.push(entry);
+      }
+    } else {
+      // Process each segment
+      for (const segment of segments) {
+        const segmentStart = segment.start || 0;
+        const segmentEnd = segment.end || segmentStart;
+        const entry = {
+          text: segment.text.trim(),
+          timestamp: formatTimestamp(segmentStart),
+          startTime: segmentStart,
+          endTime: segmentEnd,
+          language: result.language || 'en'
+        };
+        if (entry.text) {
+          liveTranscript.push(entry);
+        }
+      }
+    }
+    
+    // Update last transcribed time
+    lastTranscribedTime = result.duration || 0;
+    
+    // Update UI with new transcript entries
+    renderLiveTranscript();
+    
+  } catch (error) {
+    console.error('Error transcribing chunk:', error);
+    // Show error in transcript UI
+    if (transcriptContent && liveTranscript.length === 0) {
+      transcriptContent.innerHTML = `<div class="empty-transcript" style="color: #EF4444;">Error: ${error.message || 'Unknown error'}</div>`;
+    }
+  } finally {
+    isTranscribing = false;
+    if (transcriptProcessing) {
+      transcriptProcessing.style.display = 'none';
+    }
+  }
+}
+
+// Render live transcript entries to UI
+function renderLiveTranscript() {
+  if (!transcriptContent) return;
+  
+  if (liveTranscript.length === 0) {
+    transcriptContent.innerHTML = '<div class="empty-transcript">Listening for speech...</div>';
+    transcriptCount.textContent = '0 segments';
+    return;
+  }
+  
+  // Update count
+  transcriptCount.textContent = `${liveTranscript.length} segment${liveTranscript.length !== 1 ? 's' : ''}`;
+  
+  // Render entries
+  let html = '';
+  for (const entry of liveTranscript) {
+    html += `
+      <div class="transcript-entry">
+        <div class="transcript-timestamp">${entry.timestamp}</div>
+        <div class="transcript-text">${escapeHtml(entry.text)}</div>
+      </div>
+    `;
+  }
+  
+  transcriptContent.innerHTML = html;
+  
+  // Auto-scroll to bottom
+  transcriptContent.scrollTop = transcriptContent.scrollHeight;
+  
+  // Sync to storage so popup can display live transcript
+  chrome.storage.session.set({ 
+    liveTranscript: liveTranscript,
+    liveTranscriptCount: liveTranscript.length
+  });
+}
+
+// Escape HTML to prevent XSS
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
 }
 
 function startTimer() {
@@ -610,6 +868,7 @@ async function switchToMicrophone() {
     mediaRecorder.ondataavailable = (event) => {
       if (event.data.size > 0) {
         audioChunks.push(event.data);
+        pendingChunks.push(event.data);
       }
     };
     
@@ -654,6 +913,122 @@ async function getApiConfig() {
     provider: settings.ai_provider || 'openai',
     baseUrl: settings.api_base_url || DEFAULT_BASE_URL,
     apiKey: settings.openai_api_key || ''
+  };
+}
+
+// Get transcription-specific configuration
+async function getTranscriptionConfig() {
+  const settings = await chrome.storage.local.get([
+    'transcription_provider', 
+    'transcription_api_key', 
+    'whisper_model',
+    'ai_provider',
+    'api_base_url',
+    'openai_api_key'
+  ]);
+  
+  const transcriptionProvider = settings.transcription_provider || 'openai';
+  
+  // Use transcription-specific API key if set, otherwise fall back to main key
+  let apiKey = settings.transcription_api_key || settings.openai_api_key || '';
+  
+  // Determine base URL based on transcription provider
+  let baseUrl;
+  if (transcriptionProvider === 'groq') {
+    baseUrl = 'https://api.groq.com/openai/v1';
+  } else if (transcriptionProvider === 'local') {
+    baseUrl = 'http://localhost:5001';
+  } else {
+    baseUrl = 'https://api.openai.com/v1';
+  }
+  
+  // Default model based on provider
+  let defaultModel;
+  if (transcriptionProvider === 'groq') {
+    defaultModel = 'whisper-large-v3-turbo';
+  } else if (transcriptionProvider === 'local') {
+    defaultModel = 'distil-large-v3';
+  } else {
+    defaultModel = 'whisper-1';
+  }
+  
+  return {
+    provider: transcriptionProvider,
+    baseUrl: baseUrl,
+    apiKey: apiKey,
+    model: settings.whisper_model || defaultModel
+  };
+}
+
+// Get summary-specific configuration  
+async function getSummaryConfig() {
+  const settings = await chrome.storage.local.get([
+    'summary_provider',
+    'summary_api_key',
+    'summary_model',
+    'ai_provider',
+    'api_base_url',
+    'openai_api_key'
+  ]);
+  
+  const summaryProvider = settings.summary_provider || 'same';
+  const mainProvider = settings.ai_provider || 'openai';
+  
+  // Determine effective provider
+  const effectiveProvider = summaryProvider === 'same' ? mainProvider : summaryProvider;
+  
+  // Use summary-specific API key if set, otherwise fall back to main key
+  let apiKey = settings.summary_api_key || settings.openai_api_key || '';
+  
+  // Determine base URL based on provider
+  let baseUrl;
+  switch (effectiveProvider) {
+    case 'groq':
+      baseUrl = 'https://api.groq.com/openai/v1';
+      break;
+    case 'gemini':
+      baseUrl = 'https://generativelanguage.googleapis.com/v1beta/openai';
+      break;
+    case 'openrouter':
+      baseUrl = 'https://openrouter.ai/api/v1';
+      break;
+    case 'ollama':
+      // Use custom base URL if set, otherwise default
+      baseUrl = settings.api_base_url || 'http://localhost:11434/v1';
+      break;
+    default:
+      baseUrl = settings.api_base_url || 'https://api.openai.com/v1';
+  }
+  
+  // Default model based on provider
+  let defaultModel;
+  switch (effectiveProvider) {
+    case 'ollama':
+      defaultModel = 'llama3.2';
+      break;
+    case 'groq':
+      defaultModel = 'llama-3.3-70b-versatile';
+      break;
+    case 'gemini':
+      defaultModel = 'gemini-2.0-flash-exp';
+      break;
+    default:
+      defaultModel = 'gpt-4o-mini';
+  }
+  
+  // Validate saved model against provider - if mismatch, use default
+  let model = settings.summary_model || defaultModel;
+  
+  // If using Ollama but model looks like OpenAI model, use Ollama default
+  if (effectiveProvider === 'ollama' && (model.startsWith('gpt-') || model === 'whisper-1')) {
+    model = defaultModel;
+  }
+  
+  return {
+    provider: effectiveProvider,
+    baseUrl: baseUrl,
+    apiKey: apiKey,
+    model: model
   };
 }
 
@@ -814,13 +1189,14 @@ function formatTimestamp(seconds) {
 // Generate summary directly without message passing
 async function generateSummaryDirectly(transcript) {
   try {
-    const config = await getApiConfig();
+    const config = await getSummaryConfig();
+    console.log('Summary config:', { provider: config.provider, hasKey: !!config.apiKey, model: config.model });
+    
     if (!config.apiKey && config.provider !== 'ollama') {
       return { success: false, error: 'API key not configured. Please set it in Settings.' };
     }
     
-    const settings = await chrome.storage.local.get('summary_model');
-    const model = settings.summary_model || 'gpt-4o-mini';
+    const model = config.model;
     
     // Prepare transcript text
     let transcriptText;
@@ -839,34 +1215,42 @@ async function generateSummaryDirectly(transcript) {
       headers['Authorization'] = `Bearer ${config.apiKey}`;
     }
     
+    // Build request body - some providers don't support response_format
+    const requestBody = {
+      model: model,
+      messages: [
+        {
+          role: 'system',
+          content: `You are a meeting assistant that analyzes meeting transcripts. 
+          Provide a structured analysis in JSON format with the following fields:
+          - title: A short, descriptive title for the meeting (max 6 words)
+          - category: One of: "Work Meeting", "Interview", "Lecture", "Podcast", "Personal", "Call", "Presentation", "Brainstorm", "Other"
+          - tags: An array of 2-5 relevant tags/keywords
+          - overview: A brief 2-3 sentence summary
+          - keyPoints: An array of key discussion points (max 5)
+          - decisions: An array of decisions made
+          - nextSteps: An array of agreed next steps
+          
+          Only include fields that have actual content. Be concise and actionable.
+          IMPORTANT: Respond ONLY with valid JSON, no other text.`
+        },
+        {
+          role: 'user',
+          content: `Please analyze this meeting transcript:\n\n${transcriptText}`
+        }
+      ],
+      temperature: 0.5
+    };
+    
+    // Add response_format for providers that support it
+    if (config.provider === 'openai' || config.provider === 'groq') {
+      requestBody.response_format = { type: 'json_object' };
+    }
+    
     const response = await fetch(`${config.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: headers,
-      body: JSON.stringify({
-        model: model,
-        messages: [
-          {
-            role: 'system',
-            content: `You are a meeting assistant that analyzes meeting transcripts. 
-            Provide a structured analysis in JSON format with the following fields:
-            - title: A short, descriptive title for the meeting (max 6 words)
-            - category: One of: "Work Meeting", "Interview", "Lecture", "Podcast", "Personal", "Call", "Presentation", "Brainstorm", "Other"
-            - tags: An array of 2-5 relevant tags/keywords
-            - overview: A brief 2-3 sentence summary
-            - keyPoints: An array of key discussion points (max 5)
-            - decisions: An array of decisions made
-            - nextSteps: An array of agreed next steps
-            
-            Only include fields that have actual content. Be concise and actionable.`
-          },
-          {
-            role: 'user',
-            content: `Please analyze this meeting transcript:\n\n${transcriptText}`
-          }
-        ],
-        temperature: 0.5,
-        response_format: { type: 'json_object' }
-      })
+      body: JSON.stringify(requestBody)
     });
     
     if (!response.ok) {
@@ -875,7 +1259,44 @@ async function generateSummaryDirectly(transcript) {
     }
     
     const result = await response.json();
-    const analysis = JSON.parse(result.choices[0].message.content);
+    const content = result.choices[0].message.content;
+    
+    // Parse JSON from response - handle cases where model includes extra text
+    let analysis;
+    try {
+      analysis = JSON.parse(content);
+    } catch (parseError) {
+      // Try to extract JSON from the response (model might have added extra text)
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        try {
+          analysis = JSON.parse(jsonMatch[0]);
+        } catch (e) {
+          console.error('Could not parse JSON from response:', content);
+          // Fallback: create a basic analysis from the text
+          analysis = {
+            title: 'Meeting Recording',
+            category: 'Other',
+            tags: [],
+            overview: content.substring(0, 500),
+            keyPoints: [],
+            decisions: [],
+            nextSteps: []
+          };
+        }
+      } else {
+        // No JSON found, use content as overview
+        analysis = {
+          title: 'Meeting Recording',
+          category: 'Other',
+          tags: [],
+          overview: content.substring(0, 500),
+          keyPoints: [],
+          decisions: [],
+          nextSteps: []
+        };
+      }
+    }
     
     // Calculate cost
     const inputTokens = result.usage?.prompt_tokens || 0;

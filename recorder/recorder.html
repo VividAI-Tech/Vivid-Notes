@@ -26,7 +26,8 @@
 
     .container {
       text-align: center;
-      max-width: 400px;
+      max-width: 500px;
+      width: 100%;
     }
 
     .logo {
@@ -305,6 +306,124 @@
       color: #64748B;
       margin-right: 8px;
     }
+
+    /* Live Transcript Styles */
+    .live-transcript-container {
+      margin-top: 20px;
+      background: rgba(30, 41, 59, 0.9);
+      border-radius: 12px;
+      border: 1px solid #334155;
+      overflow: hidden;
+      max-width: 100%;
+    }
+
+    .transcript-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      background: rgba(51, 65, 85, 0.5);
+      border-bottom: 1px solid #334155;
+    }
+
+    .transcript-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      color: #F8FAFC;
+    }
+
+    .live-dot {
+      width: 8px;
+      height: 8px;
+      background: #22C55E;
+      border-radius: 50%;
+      animation: blink 1s infinite;
+    }
+
+    .transcript-count {
+      font-size: 12px;
+      color: #94A3B8;
+      background: #1E293B;
+      padding: 4px 8px;
+      border-radius: 4px;
+    }
+
+    .transcript-content {
+      max-height: 300px;
+      overflow-y: auto;
+      padding: 12px 16px;
+    }
+
+    .transcript-entry {
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(71, 85, 105, 0.3);
+    }
+
+    .transcript-entry:last-child {
+      border-bottom: none;
+    }
+
+    .transcript-timestamp {
+      font-size: 11px;
+      color: #64748B;
+      margin-bottom: 4px;
+    }
+
+    .transcript-text {
+      font-size: 13px;
+      color: #E2E8F0;
+      line-height: 1.5;
+    }
+
+    .transcript-processing {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px;
+      color: #F97316;
+      font-size: 12px;
+    }
+
+    .spinner {
+      width: 14px;
+      height: 14px;
+      border: 2px solid #475569;
+      border-top-color: #F97316;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .empty-transcript {
+      text-align: center;
+      color: #64748B;
+      font-size: 13px;
+      padding: 20px;
+    }
+
+    /* Scrollbar styling */
+    .transcript-content::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .transcript-content::-webkit-scrollbar-track {
+      background: #1E293B;
+    }
+
+    .transcript-content::-webkit-scrollbar-thumb {
+      background: #475569;
+      border-radius: 3px;
+    }
+
+    .transcript-content::-webkit-scrollbar-thumb:hover {
+      background: #64748B;
+    }
   </style>
 </head>
 
@@ -363,6 +482,26 @@
       2. Allow microphone access when prompted<br>
       3. Speak or place mic near speakers<br>
       🖥️ Enable "Record Screen" for video capture
+    </div>
+
+    <!-- Live Transcript Display -->
+    <div class="live-transcript-container" id="liveTranscriptContainer" style="display: none;">
+      <div class="transcript-header">
+        <div class="transcript-title">
+          <div class="live-dot" id="liveDot"></div>
+          <span>Live Transcript</span>
+        </div>
+        <span class="transcript-count" id="transcriptCount">0 segments</span>
+      </div>
+      <div class="transcript-content" id="transcriptContent">
+        <div class="empty-transcript" id="emptyTranscript">
+          Listening for speech...
+        </div>
+      </div>
+      <div class="transcript-processing" id="transcriptProcessing" style="display: none;">
+        <div class="spinner"></div>
+        <span>Transcribing...</span>
+      </div>
     </div>
   </div>
 

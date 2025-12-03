@@ -22,7 +22,7 @@ const PROVIDER_CONFIG = {
   },
   groq: {
     baseUrl: 'https://api.groq.com/openai/v1',
-    hint: 'Get your API key from <a href="https://console.groq.com/keys" target="_blank">Groq Console</a>',
+    hint: 'Get your API key from <a href="https://console.groq.com/keys" target="_blank">Groq Console</a>. <span style="color: #22c55e;">Free tier: 14,400 requests/day!</span>',
     placeholder: 'gsk_...',
     requiresKey: true
   },
@@ -44,6 +44,56 @@ const PROVIDER_CONFIG = {
     placeholder: 'your-api-key',
     requiresKey: true
   }
+};
+
+// Transcription models by provider (only OpenAI and Groq have Whisper API)
+const TRANSCRIPTION_MODELS = {
+  openai: [
+    { value: 'whisper-1', label: 'Whisper-1 (Standard)', hint: '$0.006/min' }
+  ],
+  groq: [
+    { value: 'whisper-large-v3-turbo', label: 'Whisper Large V3 Turbo (Fast)', hint: '$0.02/hr - Best value!' },
+    { value: 'whisper-large-v3', label: 'Whisper Large V3 (Accurate)', hint: '$0.02/hr - Best for multilingual' }
+  ],
+  local: [
+    { value: 'distil-large-v3', label: 'Distil Large V3 (Recommended)', hint: 'Free - fast & accurate' },
+    { value: 'base', label: 'Base (Fast)', hint: 'Free - good for real-time' },
+    { value: 'small', label: 'Small (Balanced)', hint: 'Free - good accuracy' },
+    { value: 'tiny', label: 'Tiny (Fastest)', hint: 'Free - basic accuracy' },
+    { value: 'large-v3-turbo', label: 'Large V3 Turbo (Slowest)', hint: 'Free - best accuracy' }
+  ]
+};
+
+// Summary models by provider
+const SUMMARY_MODELS = {
+  openai: [
+    { value: 'gpt-4o-mini', label: 'GPT-4o Mini (Fast & Affordable)' },
+    { value: 'gpt-4o', label: 'GPT-4o (Best Quality)' },
+    { value: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo (Fastest)' }
+  ],
+  gemini: [
+    { value: 'gemini-2.0-flash-exp', label: 'Gemini 2.0 Flash (Latest)' },
+    { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash (Fast)' },
+    { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro (Best Quality)' }
+  ],
+  groq: [
+    { value: 'llama-3.3-70b-versatile', label: 'Llama 3.3 70B (Best Quality)' },
+    { value: 'llama-3.1-8b-instant', label: 'Llama 3.1 8B Instant (Fastest)' },
+    { value: 'mixtral-8x7b-32768', label: 'Mixtral 8x7B (Balanced)' }
+  ],
+  openrouter: [
+    { value: 'meta-llama/llama-3.1-70b-instruct', label: 'Llama 3.1 70B' },
+    { value: 'anthropic/claude-3-haiku', label: 'Claude 3 Haiku (Fast)' },
+    { value: 'google/gemini-flash-1.5', label: 'Gemini 1.5 Flash' },
+    { value: 'mistralai/mistral-7b-instruct', label: 'Mistral 7B (Cheap)' }
+  ],
+  ollama: [
+    { value: 'llama3.2', label: 'Llama 3.2 (Recommended)' },
+    { value: 'llama3.1', label: 'Llama 3.1' },
+    { value: 'mistral', label: 'Mistral' },
+    { value: 'gemma2', label: 'Gemma 2' },
+    { value: 'phi3', label: 'Phi 3' }
+  ]
 };
 
 class OptionsManager {
@@ -76,8 +126,20 @@ class OptionsManager {
     this.showBothLanguages = document.getElementById('showBothLanguages');
     
     // Transcription Settings
+    this.transcriptionProvider = document.getElementById('transcriptionProvider');
+    this.transcriptionApiKey = document.getElementById('transcriptionApiKey');
+    this.transcriptionApiKeyGroup = document.getElementById('transcriptionApiKeyGroup');
+    this.transcriptionProviderHint = document.getElementById('transcriptionProviderHint');
     this.whisperModel = document.getElementById('whisperModel');
+    this.whisperModelHint = document.getElementById('whisperModelHint');
+    
+    // Summary Settings
+    this.summaryProvider = document.getElementById('summaryProvider');
+    this.summaryApiKey = document.getElementById('summaryApiKey');
+    this.summaryApiKeyGroup = document.getElementById('summaryApiKeyGroup');
+    this.summaryProviderHint = document.getElementById('summaryProviderHint');
     this.summaryModel = document.getElementById('summaryModel');
+    this.summaryModelHint = document.getElementById('summaryModelHint');
     
     // Export Settings
     this.exportFormat = document.getElementById('exportFormat');
@@ -91,8 +153,20 @@ class OptionsManager {
   }
   
   initEventListeners() {
-    // AI Provider change
-    this.aiProvider.addEventListener('change', () => this.onProviderChange());
+    // AI Provider change - also update summary models if 'same' is selected
+    this.aiProvider.addEventListener('change', () => {
+      this.onProviderChange();
+      // Update summary models when main provider changes (affects 'same' option)
+      if (this.summaryProvider.value === 'same') {
+        this.onSummaryProviderChange();
+      }
+    });
+    
+    // Transcription Provider change
+    this.transcriptionProvider.addEventListener('change', () => this.onTranscriptionProviderChange());
+    
+    // Summary Provider change
+    this.summaryProvider.addEventListener('change', () => this.onSummaryProviderChange());
     
     // API Key visibility toggle
     this.toggleVisibilityBtn.addEventListener('click', () => {
@@ -105,6 +179,24 @@ class OptionsManager {
       eyeOffIcon.style.display = isPassword ? 'block' : 'none';
     });
     
+    // Transcription API key visibility toggle
+    const toggleTranscriptionKey = document.getElementById('toggleTranscriptionKey');
+    if (toggleTranscriptionKey) {
+      toggleTranscriptionKey.addEventListener('click', () => {
+        const isPassword = this.transcriptionApiKey.type === 'password';
+        this.transcriptionApiKey.type = isPassword ? 'text' : 'password';
+      });
+    }
+    
+    // Summary API key visibility toggle
+    const toggleSummaryKey = document.getElementById('toggleSummaryKey');
+    if (toggleSummaryKey) {
+      toggleSummaryKey.addEventListener('click', () => {
+        const isPassword = this.summaryApiKey.type === 'password';
+        this.summaryApiKey.type = isPassword ? 'text' : 'password';
+      });
+    }
+    
     // Save Settings
     this.saveApiKeyBtn.addEventListener('click', () => this.saveProviderSettings());
     
@@ -116,7 +208,11 @@ class OptionsManager {
       this.defaultLanguage,
       this.autoTranslate,
       this.showBothLanguages,
+      this.transcriptionProvider,
+      this.transcriptionApiKey,
       this.whisperModel,
+      this.summaryProvider,
+      this.summaryApiKey,
       this.summaryModel,
       this.exportFormat,
       this.includeTimestamps,
@@ -124,7 +220,9 @@ class OptionsManager {
     ];
     
     settingsInputs.forEach(input => {
-      input.addEventListener('change', () => this.saveSettings());
+      if (input) {
+        input.addEventListener('change', () => this.saveSettings());
+      }
     });
     
     // Data Management
@@ -172,6 +270,82 @@ class OptionsManager {
     }
   }
   
+  onTranscriptionProviderChange() {
+    const provider = this.transcriptionProvider.value;
+    const models = TRANSCRIPTION_MODELS[provider] || TRANSCRIPTION_MODELS.openai;
+    
+    // Update Whisper model dropdown
+    this.whisperModel.innerHTML = models.map(m => 
+      `<option value="${m.value}">${m.label}</option>`
+    ).join('');
+    
+    // Update hint
+    const selectedModel = models[0];
+    if (this.whisperModelHint && selectedModel.hint) {
+      this.whisperModelHint.textContent = selectedModel.hint;
+    }
+    
+    // Show/hide separate API key field - hide for local provider
+    const mainProvider = this.aiProvider.value;
+    if (provider === 'local') {
+      this.transcriptionApiKeyGroup.style.display = 'none';
+    } else if (provider !== mainProvider) {
+      this.transcriptionApiKeyGroup.style.display = 'block';
+      const config = PROVIDER_CONFIG[provider];
+      if (config) {
+        document.getElementById('transcriptionApiKeyHint').innerHTML = 
+          `Get key from ${provider === 'openai' ? '<a href="https://platform.openai.com/api-keys" target="_blank">OpenAI</a>' : '<a href="https://console.groq.com/keys" target="_blank">Groq Console</a>'}`;
+      }
+    } else {
+      this.transcriptionApiKeyGroup.style.display = 'none';
+    }
+    
+    // Update provider hint
+    if (this.transcriptionProviderHint) {
+      if (provider === 'groq') {
+        this.transcriptionProviderHint.innerHTML = 'Groq: <strong>$0.02/hour</strong> - 18x cheaper than OpenAI! Free tier available.';
+      } else if (provider === 'local') {
+        this.transcriptionProviderHint.innerHTML = 'Local Whisper: <strong>Free!</strong> Runs on your machine at localhost';
+      } else {
+        this.transcriptionProviderHint.innerHTML = 'OpenAI Whisper: <strong>$0.006/min</strong> (~$0.36/hour)';
+      }
+    }
+  }
+  
+  onSummaryProviderChange() {
+    const provider = this.summaryProvider.value;
+    const mainProvider = this.aiProvider.value;
+    
+    // Determine which models to show
+    let effectiveProvider = provider === 'same' ? mainProvider : provider;
+    const models = SUMMARY_MODELS[effectiveProvider] || SUMMARY_MODELS.openai;
+    
+    // Update Summary model dropdown
+    this.summaryModel.innerHTML = models.map(m => 
+      `<option value="${m.value}">${m.label}</option>`
+    ).join('');
+    
+    // Show/hide separate API key field
+    if (provider !== 'same' && provider !== mainProvider) {
+      this.summaryApiKeyGroup.style.display = 'block';
+    } else {
+      this.summaryApiKeyGroup.style.display = 'none';
+    }
+    
+    // Update provider hint
+    if (this.summaryProviderHint) {
+      if (provider === 'same') {
+        this.summaryProviderHint.textContent = 'Using the same provider as configured above';
+      } else if (provider === 'groq') {
+        this.summaryProviderHint.innerHTML = 'Groq: <strong>Free tier</strong> with 14,400 requests/day!';
+      } else if (provider === 'ollama') {
+        this.summaryProviderHint.textContent = 'Ollama: Free, runs locally on your machine';
+      } else {
+        this.summaryProviderHint.textContent = 'Using ' + provider + ' for summaries';
+      }
+    }
+  }
+  
   async loadSettings() {
     try {
       const settings = await chrome.storage.local.get([
@@ -181,7 +355,11 @@ class OptionsManager {
         'default_language',
         'auto_translate',
         'show_both_languages',
+        'transcription_provider',
+        'transcription_api_key',
         'whisper_model',
+        'summary_provider',
+        'summary_api_key',
         'summary_model',
         'export_format',
         'include_timestamps',
@@ -218,8 +396,24 @@ class OptionsManager {
       this.showBothLanguages.checked = settings.show_both_languages !== false;
       
       // Load Transcription Settings
+      if (settings.transcription_provider) {
+        this.transcriptionProvider.value = settings.transcription_provider;
+      }
+      this.onTranscriptionProviderChange(); // Update models dropdown
+      if (settings.transcription_api_key) {
+        this.transcriptionApiKey.value = settings.transcription_api_key;
+      }
       if (settings.whisper_model) {
         this.whisperModel.value = settings.whisper_model;
+      }
+      
+      // Load Summary Settings
+      if (settings.summary_provider) {
+        this.summaryProvider.value = settings.summary_provider;
+      }
+      this.onSummaryProviderChange(); // Update models dropdown
+      if (settings.summary_api_key) {
+        this.summaryApiKey.value = settings.summary_api_key;
       }
       if (settings.summary_model) {
         this.summaryModel.value = settings.summary_model;
@@ -278,6 +472,9 @@ class OptionsManager {
     this.showStatus('info', 'Testing connection...');
     this.testApiKeyBtn.disabled = true;
     
+    // Remove trailing slashes from base URL
+    const cleanBaseUrl = baseUrl.replace(/\/+$/, '');
+    
     try {
       // Build headers
       const headers = {
@@ -288,8 +485,30 @@ class OptionsManager {
         headers['Authorization'] = `Bearer ${apiKey}`;
       }
       
+      // For Ollama, try the native /api/tags endpoint first
+      if (provider === 'ollama') {
+        // Extract base URL without /v1 for Ollama native API
+        const ollamaBase = cleanBaseUrl.replace('/v1', '');
+        try {
+          const ollamaResponse = await fetch(`${ollamaBase}/api/tags`, {
+            method: 'GET'
+          });
+          if (ollamaResponse.ok) {
+            const data = await ollamaResponse.json();
+            const modelCount = data.models?.length || 0;
+            this.showStatus('success', `Ollama connected! Found ${modelCount} model${modelCount !== 1 ? 's' : ''}.`);
+            return;
+          }
+        } catch (ollamaError) {
+          // CORS error - provide helpful message
+          console.log('Ollama connection failed:', ollamaError.message);
+          this.showStatus('error', 'Ollama CORS error. Start Ollama with: OLLAMA_ORIGINS="chrome-extension://*" ollama serve');
+          return;
+        }
+      }
+      
       // Try to list models (works for most OpenAI-compatible APIs)
-      const response = await fetch(`${baseUrl}/models`, {
+      const response = await fetch(`${cleanBaseUrl}/models`, {
         method: 'GET',
         headers: headers
       });
@@ -301,11 +520,11 @@ class OptionsManager {
       } else {
         // Try a simple chat completion for APIs that don't support /models
         try {
-          const chatResponse = await fetch(`${baseUrl}/chat/completions`, {
+          const chatResponse = await fetch(`${cleanBaseUrl}/chat/completions`, {
             method: 'POST',
             headers: headers,
             body: JSON.stringify({
-              model: provider === 'ollama' ? 'llama2' : 'gpt-3.5-turbo',
+              model: provider === 'ollama' ? 'llama3.2' : 'gpt-3.5-turbo',
               messages: [{ role: 'user', content: 'Hi' }],
               max_tokens: 5
             })
@@ -335,7 +554,11 @@ class OptionsManager {
         default_language: this.defaultLanguage.value,
         auto_translate: this.autoTranslate.checked,
         show_both_languages: this.showBothLanguages.checked,
+        transcription_provider: this.transcriptionProvider.value,
+        transcription_api_key: this.transcriptionApiKey?.value || '',
         whisper_model: this.whisperModel.value,
+        summary_provider: this.summaryProvider.value,
+        summary_api_key: this.summaryApiKey?.value || '',
         summary_model: this.summaryModel.value,
         export_format: this.exportFormat.value,
         include_timestamps: this.includeTimestamps.checked,

@@ -62,6 +62,12 @@ class FlyRecPopup {
           this.renderTranscript();
         }
         
+        // If live transcript was updated (during recording), show it
+        if (changes.liveTranscript && changes.liveTranscript.newValue) {
+          this.transcript = changes.liveTranscript.newValue;
+          this.renderTranscript();
+        }
+        
         // If summary was updated, reload it
         if (changes.summary && changes.summary.newValue) {
           this.summary = changes.summary.newValue;
@@ -283,7 +289,7 @@ class FlyRecPopup {
     try {
       const state = await chrome.storage.session.get([
         'isRecording', 'isPaused', 'elapsedSeconds', 'startTime',
-        'transcript', 'summary', 'totalCost'
+        'transcript', 'summary', 'totalCost', 'liveTranscript'
       ]);
       
       console.log('Loading state:', state);
@@ -344,6 +350,12 @@ class FlyRecPopup {
           this.elapsedSeconds = Math.floor((Date.now() - this.startTime) / 1000);
         } else {
           this.elapsedSeconds = state.elapsedSeconds || 0;
+        }
+        
+        // Load live transcript if available
+        if (state.liveTranscript && state.liveTranscript.length > 0) {
+          this.transcript = state.liveTranscript;
+          this.renderTranscript();
         }
         
         this.updateUIForRecording();
