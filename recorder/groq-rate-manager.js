@@ -186,7 +186,8 @@ class GroqRateManager {
   }
   
   /**
-   * Transcribe with rate limiting, compression, and retry logic
+   * Transcribe with compression, chunking, and retry logic
+   * Flow: Record → Compress → Chunk (23MB) → Transcribe each → Combine
    */
   async transcribeWithRateLimit(audioBlob, options = {}) {
     const { apiKey, model = 'whisper-large-v3-turbo' } = options;
@@ -195,71 +196,181 @@ class GroqRateManager {
       throw new Error('No API key configured for Groq transcription');
     }
     
-    let fileSizeMB = audioBlob.size / (1024 * 1024);
-    console.log(`[GroqRateManager] Original audio: ${fileSizeMB.toFixed(2)}MB`);
+    const originalSizeMB = audioBlob.size / (1024 * 1024);
+    console.log(`[GroqRateManager] Original audio: ${originalSizeMB.toFixed(2)}MB`);
     
     // Reset counters if needed
     this.resetIfNeeded();
     
-    // Compress audio if it's large (>10MB) or close to limit
-    // Speech transcription works fine with compressed audio
-    let processedBlob = audioBlob;
-    if (fileSizeMB > 10) {
-      console.log('[GroqRateManager] Compressing audio for optimal upload...');
-      try {
-        processedBlob = await this.compressAudioForSpeech(audioBlob);
-        const newSizeMB = processedBlob.size / (1024 * 1024);
-        console.log(`[GroqRateManager] Compressed: ${fileSizeMB.toFixed(2)}MB → ${newSizeMB.toFixed(2)}MB (${Math.round((1 - newSizeMB/fileSizeMB) * 100)}% reduction)`);
-        fileSizeMB = newSizeMB;
-      } catch (compressError) {
-        console.warn('[GroqRateManager] Compression failed, using original:', compressError.message);
-        processedBlob = audioBlob;
+    // Step 1: Decode and normalize audio to 16kHz mono (optimal for speech)
+    console.log('[GroqRateManager] Step 1: Decoding and normalizing audio...');
+    let audioBuffer;
+    try {
+      audioBuffer = await this.decodeAudioToBuffer(audioBlob);
+      console.log(`[GroqRateManager] Decoded: ${audioBuffer.duration.toFixed(1)}s, ${audioBuffer.sampleRate}Hz, ${audioBuffer.numberOfChannels}ch`);
+    } catch (error) {
+      console.error('[GroqRateManager] Failed to decode audio:', error);
+      throw new Error('Failed to decode audio file');
+    }
+    
+    // Step 2: Split into chunks of ~23MB (WAV at 16kHz mono 16-bit = 32KB/sec)
+    // 23MB / 32KB = ~720 seconds per chunk (~12 minutes)
+    const CHUNK_SIZE_MB = 23;
+    const BYTES_PER_SECOND = 16000 * 2; // 16kHz * 16-bit = 32KB/s
+    const MAX_CHUNK_SECONDS = (CHUNK_SIZE_MB * 1024 * 1024 - 44) / BYTES_PER_SECOND; // -44 for WAV header
+    
+    const totalDuration = audioBuffer.duration;
+    const numChunks = Math.ceil(totalDuration / MAX_CHUNK_SECONDS);
+    
+    console.log(`[GroqRateManager] Step 2: Splitting into ${numChunks} chunks (max ${Math.floor(MAX_CHUNK_SECONDS/60)}min each)`);
+    
+    // Step 3: Transcribe each chunk
+    const allSegments = [];
+    let totalTranscribedDuration = 0;
+    
+    for (let i = 0; i < numChunks; i++) {
+      const startTime = i * MAX_CHUNK_SECONDS;
+      const endTime = Math.min((i + 1) * MAX_CHUNK_SECONDS, totalDuration);
+      const chunkDuration = endTime - startTime;
+      
+      console.log(`[GroqRateManager] Step 3.${i + 1}: Processing chunk ${i + 1}/${numChunks} (${startTime.toFixed(1)}s - ${endTime.toFixed(1)}s)`);
+      
+      // Extract chunk from audio buffer
+      const chunkBuffer = this.extractAudioChunk(audioBuffer, startTime, endTime);
+      const chunkWav = this.audioBufferToWav(chunkBuffer);
+      
+      const chunkSizeMB = chunkWav.size / (1024 * 1024);
+      console.log(`[GroqRateManager] Chunk ${i + 1} size: ${chunkSizeMB.toFixed(2)}MB`);
+      
+      // Transcribe this chunk with retries
+      const result = await this.transcribeChunkWithRetry(chunkWav, apiKey, model, i + 1, numChunks);
+      
+      // Record usage
+      if (result.duration) {
+        this.recordUsage(result.duration);
+        totalTranscribedDuration += result.duration;
+      }
+      
+      // Adjust segment timestamps and add to results
+      if (result.segments) {
+        for (const segment of result.segments) {
+          allSegments.push({
+            ...segment,
+            start: (segment.start || 0) + startTime,
+            end: (segment.end || 0) + startTime
+          });
+        }
+      } else if (result.text) {
+        allSegments.push({
+          text: result.text,
+          start: startTime,
+          end: endTime
+        });
+      }
+      
+      // Small delay between chunks to be nice to the API
+      if (i < numChunks - 1) {
+        await new Promise(r => setTimeout(r, 1000));
       }
     }
     
-    // Check file size after compression
-    if (fileSizeMB > this.MAX_FILE_SIZE_MB) {
-      throw new Error(`Audio file (${fileSizeMB.toFixed(1)}MB) still exceeds Groq's 25MB limit after compression. Try a shorter recording.`);
+    // Combine all text
+    const fullText = allSegments.map(s => s.text).join(' ');
+    
+    console.log(`[GroqRateManager] Transcription complete: ${allSegments.length} segments, ${totalTranscribedDuration.toFixed(1)}s total`);
+    
+    return {
+      text: fullText,
+      segments: allSegments,
+      duration: totalTranscribedDuration,
+      language: 'en'
+    };
+  }
+  
+  /**
+   * Decode audio blob to AudioBuffer at 16kHz mono
+   */
+  async decodeAudioToBuffer(audioBlob) {
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const arrayBuffer = await audioBlob.arrayBuffer();
+    const decodedBuffer = await audioContext.decodeAudioData(arrayBuffer);
+    
+    // Resample to 16kHz mono
+    const offlineContext = new OfflineAudioContext(
+      1, // Mono
+      Math.ceil(decodedBuffer.duration * 16000),
+      16000 // 16kHz
+    );
+    
+    const source = offlineContext.createBufferSource();
+    source.buffer = decodedBuffer;
+    source.connect(offlineContext.destination);
+    source.start();
+    
+    const renderedBuffer = await offlineContext.startRendering();
+    audioContext.close();
+    
+    return renderedBuffer;
+  }
+  
+  /**
+   * Extract a time-based chunk from an AudioBuffer
+   */
+  extractAudioChunk(audioBuffer, startTime, endTime) {
+    const sampleRate = audioBuffer.sampleRate;
+    const startSample = Math.floor(startTime * sampleRate);
+    const endSample = Math.min(Math.floor(endTime * sampleRate), audioBuffer.length);
+    const length = endSample - startSample;
+    
+    // Create new buffer for chunk
+    const offlineContext = new OfflineAudioContext(1, length, sampleRate);
+    const chunkBuffer = offlineContext.createBuffer(1, length, sampleRate);
+    
+    // Copy samples
+    const sourceData = audioBuffer.getChannelData(0);
+    const destData = chunkBuffer.getChannelData(0);
+    for (let i = 0; i < length; i++) {
+      destData[i] = sourceData[startSample + i];
     }
     
-    // Try transcription with retries for transient errors
+    return chunkBuffer;
+  }
+  
+  /**
+   * Transcribe a single chunk with retry logic
+   */
+  async transcribeChunkWithRetry(wavBlob, apiKey, model, chunkNum, totalChunks) {
     const maxRetries = 3;
     let lastError;
     
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        console.log(`[GroqRateManager] Transcription attempt ${attempt}/${maxRetries}`);
-        const result = await this.transcribeGroq(processedBlob, apiKey, model);
-        
-        // Record actual duration (from API response)
-        const actualDuration = result.duration || 60;
-        this.recordUsage(actualDuration);
-        
-        return result;
+        console.log(`[GroqRateManager] Chunk ${chunkNum}/${totalChunks} - attempt ${attempt}/${maxRetries}`);
+        return await this.transcribeGroq(wavBlob, apiKey, model);
       } catch (error) {
         lastError = error;
-        console.error(`[GroqRateManager] Attempt ${attempt} failed:`, error.message);
+        console.error(`[GroqRateManager] Chunk ${chunkNum} attempt ${attempt} failed:`, error.message);
         
-        // Handle rate limit errors
+        // Handle rate limit - wait longer
         if (error.message.includes('429') || error.message.includes('rate limit')) {
-          console.log('[GroqRateManager] Hit rate limit, updating usage data');
+          console.log('[GroqRateManager] Rate limited, waiting 60s...');
           this.usageData.audioSecondsThisHour = this.AUDIO_SECONDS_PER_HOUR;
           this.saveUsageData();
-          throw error; // Don't retry rate limits
+          await new Promise(r => setTimeout(r, 60000));
+          continue;
         }
         
-        // Retry on server errors (500, 502, 503, etc.)
+        // Retry on server errors
         if (error.message.includes('500') || error.message.includes('Internal Server Error') ||
             error.message.includes('502') || error.message.includes('503')) {
           if (attempt < maxRetries) {
-            const waitTime = attempt * 5000; // 5s, 10s, 15s
-            console.log(`[GroqRateManager] Server error, waiting ${waitTime/1000}s before retry...`);
+            const waitTime = attempt * 5000;
+            console.log(`[GroqRateManager] Server error, waiting ${waitTime/1000}s...`);
             await new Promise(r => setTimeout(r, waitTime));
             continue;
           }
         }
         
-        // Don't retry other errors
         throw error;
       }
     }
@@ -268,42 +379,14 @@ class GroqRateManager {
   }
   
   /**
-   * Compress audio for speech transcription without quality loss
-   * Uses 16kHz mono opus - optimal for speech recognition
+   * Legacy: Compress audio for speech (kept for compatibility)
    */
   async compressAudioForSpeech(audioBlob) {
     return new Promise(async (resolve, reject) => {
       try {
-        // Decode the audio
-        const audioContext = new (window.AudioContext || window.webkitAudioContext)({
-          sampleRate: 16000 // Optimal for speech recognition
-        });
-        
-        const arrayBuffer = await audioBlob.arrayBuffer();
-        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-        
-        // Create offline context for processing
-        const offlineContext = new OfflineAudioContext(
-          1, // Mono - sufficient for speech
-          audioBuffer.duration * 16000,
-          16000 // 16kHz sample rate
-        );
-        
-        // Create buffer source
-        const source = offlineContext.createBufferSource();
-        source.buffer = audioBuffer;
-        source.connect(offlineContext.destination);
-        source.start();
-        
-        // Render the audio
-        const renderedBuffer = await offlineContext.startRendering();
-        
-        // Convert to WAV (widely supported, good compression for speech)
-        const wavBlob = this.audioBufferToWav(renderedBuffer);
-        
-        audioContext.close();
+        const audioBuffer = await this.decodeAudioToBuffer(audioBlob);
+        const wavBlob = this.audioBufferToWav(audioBuffer);
         resolve(wavBlob);
-        
       } catch (error) {
         reject(error);
       }
