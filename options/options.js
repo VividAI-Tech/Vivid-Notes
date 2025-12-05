@@ -52,8 +52,8 @@ const TRANSCRIPTION_MODELS = {
     { value: 'whisper-1', label: 'Whisper-1 (Standard)', hint: '$0.006/min' }
   ],
   groq: [
-    { value: 'whisper-large-v3-turbo', label: 'Whisper Large V3 Turbo (Fast)', hint: 'Free tier - Best value!' },
-    { value: 'whisper-large-v3', label: 'Whisper Large V3 (Accurate)', hint: 'Free tier - Best for multilingual & translation' }
+    { value: 'whisper-large-v3-turbo', label: 'Whisper Large V3 Turbo (Fast)', hint: 'Free - Transcription only' },
+    { value: 'whisper-large-v3', label: 'Whisper Large V3 (Accurate)', hint: 'Free - Supports translation to English' }
   ],
   local: [
     { value: 'distil-large-v3', label: 'Distil Large V3 (Recommended)', hint: 'Free - fast & accurate' },

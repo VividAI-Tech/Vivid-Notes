@@ -522,13 +522,21 @@ class GroqRateManager {
                       audioBlob.type.includes('mp3') ? 'mp3' : 
                       audioBlob.type.includes('mp4') ? 'm4a' : 'webm';
     
+    // IMPORTANT: Only whisper-large-v3 supports translation, NOT whisper-large-v3-turbo
+    // Force model switch when translation is needed
+    const effectiveModel = translate ? 'whisper-large-v3' : model;
+    
+    if (translate && model !== 'whisper-large-v3') {
+      console.log(`[GroqRateManager] Switching from ${model} to whisper-large-v3 for translation (turbo doesn't support translate)`);
+    }
+    
     const endpoint = translate 
       ? 'https://api.groq.com/openai/v1/audio/translations'
       : 'https://api.groq.com/openai/v1/audio/transcriptions';
     
     const formData = new FormData();
     formData.append('file', audioBlob, `audio.${extension}`);
-    formData.append('model', model);
+    formData.append('model', effectiveModel);
     formData.append('response_format', 'verbose_json');
     
     // Only transcription supports timestamp granularities
