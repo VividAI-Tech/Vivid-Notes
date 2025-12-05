@@ -25,14 +25,7 @@ let analyser = null;
 let audioMonitorInterval = null;
 let audioPlaybackElement = null;
 
-// Live transcription state
-let liveTranscript = [];          // Accumulated transcript entries
-let pendingChunks = [];           // Audio chunks waiting to be transcribed
-let transcriptionInterval = null; // Interval for periodic transcription
-let isTranscribing = false;       // Flag to prevent concurrent transcriptions
-let chunkStartTime = 0;           // Track when the current chunk started
-let lastTranscribedTime = 0;      // Track last transcribed audio time (seconds)
-const TRANSCRIPTION_INTERVAL_MS = 5000; // Transcribe every 5 seconds for faster live transcription
+// Transcription state (final transcription only, no live)
 let totalTranscriptionCost = 0;   // Track transcription cost
 
 // Elements
@@ -47,12 +40,17 @@ const audioStatus = document.getElementById('audioStatus');
 const micFallbackBtn = document.getElementById('micFallbackBtn');
 const recordScreenToggle = document.getElementById('recordScreenToggle');
 
-// Live transcript UI elements
-const liveTranscriptContainer = document.getElementById('liveTranscriptContainer');
-const transcriptContent = document.getElementById('transcriptContent');
-const transcriptCount = document.getElementById('transcriptCount');
-const transcriptProcessing = document.getElementById('transcriptProcessing');
-const emptyTranscript = document.getElementById('emptyTranscript');
+// Rate limit UI elements (for Groq)
+const rateLimitStatus = document.getElementById('rateLimitStatus');
+const rateLimitBadge = document.getElementById('rateLimitBadge');
+const hourlyBar = document.getElementById('hourlyBar');
+const hourlyValue = document.getElementById('hourlyValue');
+const dailyBar = document.getElementById('dailyBar');
+const dailyValue = document.getElementById('dailyValue');
+const rateLimitReset = document.getElementById('rateLimitReset');
+
+// Rate limit update interval
+let rateLimitUpdateInterval = null;
 
 // Screen recording state
 let recordScreenEnabled = false;
@@ -178,7 +176,6 @@ async function startRecording() {
     mediaRecorder.ondataavailable = (event) => {
       if (event.data.size > 0) {
         audioChunks.push(event.data);
-        pendingChunks.push(event.data);
       }
     };
     
@@ -196,29 +193,11 @@ async function startRecording() {
       };
     });
     
-    // Reset live transcription state
-    liveTranscript = [];
-    pendingChunks = [];
+    // Reset transcription cost
     totalTranscriptionCost = 0;
-    chunkStartTime = 0;
-    lastTranscribedTime = 0;
     
-    // Show live transcript container
-    console.log('Setting up live transcript container:', liveTranscriptContainer);
-    if (liveTranscriptContainer) {
-      liveTranscriptContainer.style.display = 'block';
-      transcriptContent.innerHTML = '<div class="empty-transcript" id="emptyTranscript">Listening for speech...</div>';
-      transcriptCount.textContent = '0 segments';
-    } else {
-      console.error('Live transcript container not found!');
-    }
-    
-    // Start periodic live transcription (every 30 seconds)
-    console.log('Starting live transcription interval:', TRANSCRIPTION_INTERVAL_MS, 'ms');
-    transcriptionInterval = setInterval(async () => {
-      console.log('Transcription interval triggered, pending chunks:', pendingChunks.length);
-      await transcribePendingChunks();
-    }, TRANSCRIPTION_INTERVAL_MS);
+    // Start rate limit UI updates (for Groq provider)
+    startRateLimitUpdates();
     
     // Start recording
     mediaRecorder.start(1000);
@@ -267,17 +246,8 @@ async function stopRecording() {
   // Stop timer
   clearInterval(timerInterval);
   
-  // Stop live transcription interval
-  if (transcriptionInterval) {
-    clearInterval(transcriptionInterval);
-    transcriptionInterval = null;
-  }
-  
-  // Process any remaining pending chunks before final processing
-  if (pendingChunks.length > 0 && !isTranscribing) {
-    status.textContent = 'Transcribing final segment...';
-    await transcribePendingChunks();
-  }
+  // Stop rate limit UI updates
+  stopRateLimitUpdates();
   
   // Stop audio monitoring and playback
   stopAudioMonitoring();
@@ -301,9 +271,137 @@ async function stopRecording() {
   await saveRecordingState(false);
 }
 
+/**
+ * Transcribe the full recording using Groq rate manager or fallback
+ */
+async function transcribeFullRecording() {
+  try {
+    const config = await getTranscriptionConfig();
+    console.log('Transcription config:', { provider: config.provider, hasKey: !!config.apiKey, model: config.model });
+    
+    // Local provider doesn't need API key
+    if (!config.apiKey && config.provider !== 'local') {
+      return { success: false, error: 'API key not configured. Please set it in Settings.' };
+    }
+    
+    // Create audio blob from chunks
+    const mimeType = mediaRecorder?.mimeType || 'audio/webm';
+    const audioBlob = new Blob(audioChunks, { type: mimeType });
+    
+    console.log('Transcribing full audio:', audioBlob.size, 'bytes');
+    
+    if (audioBlob.size < 1000) {
+      return { success: false, error: 'Audio too short to transcribe' };
+    }
+    
+    let result;
+    
+    if (config.provider === 'local') {
+      // Local faster-whisper server
+      const formData = new FormData();
+      formData.append('audio', audioBlob, 'recording.webm');
+      if (config.model) {
+        formData.append('model', config.model);
+      }
+      
+      const response = await fetch(`${config.baseUrl}/transcribe`, {
+        method: 'POST',
+        body: formData
+      });
+      
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: 'Transcription failed' }));
+        return { success: false, error: error.error || 'Local transcription failed' };
+      }
+      
+      result = await response.json();
+      result.provider = 'local';
+      
+    } else if (config.provider === 'groq' && typeof groqRateManager !== 'undefined') {
+      // Use rate manager for Groq to handle free tier limits
+      result = await groqRateManager.transcribeWithRateLimit(audioBlob, {
+        apiKey: config.apiKey,
+        model: config.model,
+        preferLocal: false
+      });
+      
+      // Update rate limit UI
+      updateRateLimitUI();
+      
+    } else {
+      // OpenAI API format
+      const formData = new FormData();
+      formData.append('file', audioBlob, 'recording.webm');
+      formData.append('model', config.model);
+      formData.append('response_format', 'verbose_json');
+      formData.append('timestamp_granularities[]', 'segment');
+      
+      const response = await fetch(`${config.baseUrl}/audio/transcriptions`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${config.apiKey}` },
+        body: formData
+      });
+      
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: { message: 'Transcription failed' } }));
+        return { success: false, error: error.error?.message || 'Transcription failed' };
+      }
+      
+      result = await response.json();
+    }
+    
+    // Process result into transcript array
+    const segments = result.segments || [];
+    const transcript = [];
+    
+    if (segments.length === 0 && result.text) {
+      // No segments but has text
+      transcript.push({
+        text: result.text.trim(),
+        timestamp: formatTimestamp(0),
+        startTime: 0,
+        endTime: result.duration || 0,
+        language: result.language || 'en'
+      });
+    } else {
+      for (const segment of segments) {
+        const text = (segment.text || '').trim();
+        if (text) {
+          transcript.push({
+            text: text,
+            timestamp: formatTimestamp(segment.start || 0),
+            startTime: segment.start || 0,
+            endTime: segment.end || segment.start || 0,
+            language: result.language || 'en'
+          });
+        }
+      }
+    }
+    
+    // Calculate cost (local is free)
+    let cost = 0;
+    if (config.provider !== 'local') {
+      const durationMinutes = (result.duration || 0) / 60;
+      cost = durationMinutes * PRICING['whisper-1'];
+    }
+    
+    return {
+      success: true,
+      transcript,
+      cost,
+      duration: result.duration,
+      language: result.language
+    };
+    
+  } catch (error) {
+    console.error('Transcription error:', error);
+    return { success: false, error: error.message || 'Unknown transcription error' };
+  }
+}
+
 async function processRecording() {
   try {
-    if (audioChunks.length === 0 && liveTranscript.length === 0) {
+    if (audioChunks.length === 0) {
       status.textContent = 'No audio recorded';
       resetUI();
       return;
@@ -325,17 +423,31 @@ async function processRecording() {
       document.body.removeChild(a);
       URL.revokeObjectURL(videoUrl);
       
-      status.textContent = 'Video saved! Now processing...';
+      status.textContent = 'Video saved! Now transcribing...';
     }
     
     const elapsedSeconds = startTime ? Math.floor((Date.now() - startTime) / 1000) : 0;
     
-    // Use accumulated live transcript instead of re-transcribing
-    // This avoids the long audio file issue and provides immediate results
-    const transcriptData = liveTranscript;
-    const transcriptCost = totalTranscriptionCost;
+    // Transcribe the full recording
+    status.textContent = 'Transcribing audio...';
+    const transcriptionResult = await transcribeFullRecording();
     
-    console.log('Using live transcript:', transcriptData.length, 'segments');
+    if (!transcriptionResult.success) {
+      status.textContent = 'Transcription failed: ' + transcriptionResult.error;
+      await chrome.storage.session.set({
+        isRecording: false,
+        startTime: null,
+        isPaused: false
+      });
+      resetUI();
+      return;
+    }
+    
+    const transcriptData = transcriptionResult.transcript;
+    const transcriptCost = transcriptionResult.cost || 0;
+    totalTranscriptionCost = transcriptCost;
+    
+    console.log('Transcription complete:', transcriptData.length, 'segments');
     
     // Check if transcript is empty
     if (transcriptData.length === 0) {
@@ -453,219 +565,6 @@ function resetUI() {
   
   // Reset screen recording state
   screenStream = null;
-  
-  // Hide live transcript container after a delay to show final state
-  setTimeout(() => {
-    if (!isRecording && liveTranscriptContainer) {
-      liveTranscriptContainer.style.display = 'none';
-    }
-  }, 5000);
-}
-
-// Transcribe pending audio chunks for live transcription
-async function transcribePendingChunks() {
-  if (isTranscribing || pendingChunks.length === 0) {
-    return;
-  }
-  
-  isTranscribing = true;
-  
-  // Show processing indicator
-  if (transcriptProcessing) {
-    transcriptProcessing.style.display = 'flex';
-  }
-  
-  try {
-    const config = await getTranscriptionConfig();
-    console.log('Transcription config:', { provider: config.provider, hasKey: !!config.apiKey, baseUrl: config.baseUrl, model: config.model });
-    
-    // Local provider doesn't need API key
-    if (!config.apiKey && config.provider !== 'local') {
-      console.error('API key not configured for transcription');
-      if (transcriptContent) {
-        transcriptContent.innerHTML = '<div class="empty-transcript" style="color: #F97316;">Please configure your API key in Settings</div>';
-      }
-      isTranscribing = false;
-      if (transcriptProcessing) transcriptProcessing.style.display = 'none';
-      return;
-    }
-    
-    // Use ALL audioChunks to create a complete WebM file with proper headers
-    // This is necessary because WebM container format needs the header from the first chunk
-    const mimeType = mediaRecorder?.mimeType || 'audio/webm';
-    const audioBlob = new Blob(audioChunks, { type: mimeType });
-    
-    // Clear pending chunks (we use audioChunks for the complete file)
-    pendingChunks = [];
-    
-    console.log('Total audio chunks:', audioChunks.length, 'Total size:', audioBlob.size);
-    
-    // Only process if blob has meaningful size (at least 1KB)
-    if (audioBlob.size < 1000) {
-      console.log('Audio too small:', audioBlob.size, 'bytes, skipping');
-      isTranscribing = false;
-      if (transcriptProcessing) transcriptProcessing.style.display = 'none';
-      return;
-    }
-    
-    console.log('Transcribing complete audio:', audioBlob.size, 'bytes, mimeType:', mimeType, 'provider:', config.provider, 'lastTranscribedTime:', lastTranscribedTime);
-    
-    let response;
-    
-    if (config.provider === 'local') {
-      // Local faster-whisper server uses different API format
-      const formData = new FormData();
-      formData.append('audio', audioBlob, 'chunk.webm');
-      if (config.model) {
-        formData.append('model', config.model);
-      }
-      
-      response = await fetch(`${config.baseUrl}/transcribe`, {
-        method: 'POST',
-        body: formData
-      });
-    } else {
-      // OpenAI/Groq API format
-      const formData = new FormData();
-      formData.append('file', audioBlob, 'chunk.webm');
-      formData.append('model', config.model);
-      formData.append('response_format', 'verbose_json');
-      formData.append('timestamp_granularities[]', 'segment');
-      
-      const headers = {
-        'Authorization': `Bearer ${config.apiKey}`
-      };
-      
-      response = await fetch(`${config.baseUrl}/audio/transcriptions`, {
-        method: 'POST',
-        headers: headers,
-        body: formData
-      });
-    }
-    
-    if (!response.ok) {
-      let errorMsg = `HTTP ${response.status}`;
-      try {
-        const error = await response.json();
-        errorMsg = error.error?.message || JSON.stringify(error);
-        console.error('Transcription error:', errorMsg, error);
-      } catch (e) {
-        const text = await response.text();
-        errorMsg = text || response.statusText;
-        console.error('Transcription error:', errorMsg);
-      }
-      // Show error in UI
-      if (transcriptContent) {
-        const errorDiv = document.createElement('div');
-        errorDiv.className = 'transcript-entry';
-        errorDiv.innerHTML = `<div class="transcript-text" style="color: #EF4444;">Transcription error: ${errorMsg}</div>`;
-        transcriptContent.appendChild(errorDiv);
-      }
-      isTranscribing = false;
-      if (transcriptProcessing) transcriptProcessing.style.display = 'none';
-      return;
-    }
-    
-    const result = await response.json();
-    
-    // Calculate cost for this chunk (local is free)
-    if (config.provider !== 'local') {
-      const durationMinutes = (result.duration || 30) / 60;
-      const chunkCost = durationMinutes * PRICING['whisper-1'];
-      totalTranscriptionCost += chunkCost;
-    }
-    
-    // Process segments and add to live transcript
-    // Since we transcribe complete audio each time, replace liveTranscript with all segments
-    const segments = result.segments || [];
-    
-    // Clear existing transcript and rebuild from complete transcription
-    liveTranscript = [];
-    
-    if (segments.length === 0 && result.text) {
-      // No segments but has text - create a single entry
-      const entry = {
-        text: result.text.trim(),
-        timestamp: formatTimestamp(0),
-        startTime: 0,
-        endTime: result.duration || 0,
-        language: result.language || 'en'
-      };
-      if (entry.text) {
-        liveTranscript.push(entry);
-      }
-    } else {
-      // Process each segment
-      for (const segment of segments) {
-        const segmentStart = segment.start || 0;
-        const segmentEnd = segment.end || segmentStart;
-        const entry = {
-          text: segment.text.trim(),
-          timestamp: formatTimestamp(segmentStart),
-          startTime: segmentStart,
-          endTime: segmentEnd,
-          language: result.language || 'en'
-        };
-        if (entry.text) {
-          liveTranscript.push(entry);
-        }
-      }
-    }
-    
-    // Update last transcribed time
-    lastTranscribedTime = result.duration || 0;
-    
-    // Update UI with new transcript entries
-    renderLiveTranscript();
-    
-  } catch (error) {
-    console.error('Error transcribing chunk:', error);
-    // Show error in transcript UI
-    if (transcriptContent && liveTranscript.length === 0) {
-      transcriptContent.innerHTML = `<div class="empty-transcript" style="color: #EF4444;">Error: ${error.message || 'Unknown error'}</div>`;
-    }
-  } finally {
-    isTranscribing = false;
-    if (transcriptProcessing) {
-      transcriptProcessing.style.display = 'none';
-    }
-  }
-}
-
-// Render live transcript entries to UI
-function renderLiveTranscript() {
-  if (!transcriptContent) return;
-  
-  if (liveTranscript.length === 0) {
-    transcriptContent.innerHTML = '<div class="empty-transcript">Listening for speech...</div>';
-    transcriptCount.textContent = '0 segments';
-    return;
-  }
-  
-  // Update count
-  transcriptCount.textContent = `${liveTranscript.length} segment${liveTranscript.length !== 1 ? 's' : ''}`;
-  
-  // Render entries
-  let html = '';
-  for (const entry of liveTranscript) {
-    html += `
-      <div class="transcript-entry">
-        <div class="transcript-timestamp">${entry.timestamp}</div>
-        <div class="transcript-text">${escapeHtml(entry.text)}</div>
-      </div>
-    `;
-  }
-  
-  transcriptContent.innerHTML = html;
-  
-  // Auto-scroll to bottom
-  transcriptContent.scrollTop = transcriptContent.scrollHeight;
-  
-  // Sync to storage so popup can display live transcript
-  chrome.storage.session.set({ 
-    liveTranscript: liveTranscript,
-    liveTranscriptCount: liveTranscript.length
-  });
 }
 
 // Escape HTML to prevent XSS
@@ -674,6 +573,95 @@ function escapeHtml(text) {
   div.textContent = text;
   return div.innerHTML;
 }
+
+// ========== Rate Limit UI Functions ==========
+
+/**
+ * Update the rate limit status UI for Groq provider
+ */
+async function updateRateLimitUI() {
+  const config = await getTranscriptionConfig();
+  
+  // Only show for Groq provider
+  if (config.provider !== 'groq' || !rateLimitStatus) {
+    if (rateLimitStatus) rateLimitStatus.style.display = 'none';
+    return;
+  }
+  
+  // Check if rate manager is available
+  if (typeof groqRateManager === 'undefined') {
+    rateLimitStatus.style.display = 'none';
+    return;
+  }
+  
+  const status = groqRateManager.getStatus();
+  
+  // Show the status panel
+  rateLimitStatus.style.display = 'block';
+  
+  // Update hourly bar
+  const hourlyPercent = Math.min(100, status.hourlyPercentUsed);
+  const hourlyMinUsed = Math.round(status.hourlyUsed / 60);
+  const hourlyMinLimit = Math.round(status.hourlyLimit / 60);
+  
+  hourlyBar.style.width = `${hourlyPercent}%`;
+  hourlyBar.className = `rate-bar-fill ${getStatusClass(hourlyPercent)}`;
+  hourlyValue.textContent = `${hourlyMinUsed} / ${hourlyMinLimit} min`;
+  
+  // Update daily bar
+  const dailyPercent = Math.min(100, status.dailyPercentUsed);
+  const dailyMinUsed = Math.round(status.dailyUsed / 60);
+  const dailyMinLimit = Math.round(status.dailyLimit / 60);
+  
+  dailyBar.style.width = `${dailyPercent}%`;
+  dailyBar.className = `rate-bar-fill ${getStatusClass(dailyPercent)}`;
+  dailyValue.textContent = `${dailyMinUsed} / ${dailyMinLimit} min`;
+  
+  // Update badge
+  const overallPercent = Math.max(hourlyPercent, dailyPercent);
+  const badgeClass = getStatusClass(overallPercent);
+  rateLimitBadge.className = `rate-limit-badge ${badgeClass}`;
+  
+  if (overallPercent >= 90) {
+    rateLimitBadge.textContent = 'LIMIT';
+  } else if (overallPercent >= 70) {
+    rateLimitBadge.textContent = 'HIGH';
+  } else {
+    rateLimitBadge.textContent = 'OK';
+  }
+  
+  // Update reset time
+  const hourResetMin = Math.ceil(status.hourResetIn / 60000);
+  rateLimitReset.textContent = `Hour resets in ${hourResetMin}m`;
+}
+
+function getStatusClass(percent) {
+  if (percent >= 90) return 'danger';
+  if (percent >= 70) return 'warning';
+  return 'ok';
+}
+
+/**
+ * Start updating rate limit UI periodically
+ */
+function startRateLimitUpdates() {
+  updateRateLimitUI();
+  if (!rateLimitUpdateInterval) {
+    rateLimitUpdateInterval = setInterval(updateRateLimitUI, 10000); // Update every 10 seconds
+  }
+}
+
+/**
+ * Stop updating rate limit UI
+ */
+function stopRateLimitUpdates() {
+  if (rateLimitUpdateInterval) {
+    clearInterval(rateLimitUpdateInterval);
+    rateLimitUpdateInterval = null;
+  }
+}
+
+// ========== End Rate Limit UI Functions ==========
 
 function startTimer() {
   timerInterval = setInterval(() => {
@@ -868,7 +856,6 @@ async function switchToMicrophone() {
     mediaRecorder.ondataavailable = (event) => {
       if (event.data.size > 0) {
         audioChunks.push(event.data);
-        pendingChunks.push(event.data);
       }
     };
     

@@ -310,6 +310,15 @@ class OptionsManager {
         this.transcriptionProviderHint.innerHTML = 'OpenAI Whisper: <strong>$0.006/min</strong> (~$0.36/hour)';
       }
     }
+    
+    // Show/hide Groq-specific elements
+    const groqStrategyBox = document.getElementById('groqStrategyBox');
+    
+    if (provider === 'groq') {
+      if (groqStrategyBox) groqStrategyBox.style.display = 'block';
+    } else {
+      if (groqStrategyBox) groqStrategyBox.style.display = 'none';
+    }
   }
   
   onSummaryProviderChange() {

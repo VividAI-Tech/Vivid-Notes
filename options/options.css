@@ -334,6 +334,102 @@ body {
   color: var(--primary-blue-light);
 }
 
+/* Groq Strategy Info Box */
+.info-box {
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  margin-top: 16px;
+}
+
+.info-box.groq-strategy {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(249, 115, 22, 0.1));
+  border: 1px solid rgba(249, 115, 22, 0.3);
+}
+
+.info-box h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--primary-orange);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.info-box h3::before {
+  content: "⚡";
+}
+
+.strategy-info p {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.strategy-info p strong {
+  color: var(--text-primary);
+}
+
+.strategy-info ul {
+  list-style: none;
+  margin: 0 0 12px 0;
+  padding: 0;
+}
+
+.strategy-info ul li {
+  font-size: 12px;
+  color: var(--text-secondary);
+  padding: 4px 0 4px 20px;
+  position: relative;
+}
+
+.strategy-info ul li::before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  color: var(--success);
+}
+
+.strategy-info .limit-label {
+  color: var(--primary-orange-light);
+  font-weight: 500;
+}
+
+.strategy-info .tip {
+  background: rgba(34, 197, 94, 0.1);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--success);
+  border-left: 3px solid var(--success);
+}
+
+/* Textarea styling */
+textarea {
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-family: 'Fira Code', 'Monaco', monospace;
+  font-size: 12px;
+  resize: vertical;
+  transition: border-color 0.2s;
+}
+
+textarea:focus {
+  outline: none;
+  border-color: var(--primary-blue-light);
+}
+
+textarea::placeholder {
+  color: var(--text-muted);
+}
+
 /* Footer */
 .footer {
   text-align: center;
