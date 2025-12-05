@@ -497,6 +497,29 @@ async function generateSummary(transcript) {
       transcriptText = String(transcript);
     }
     
+    // Estimate token count (roughly 4 chars per token) and truncate if needed
+    // Different models have different limits - be conservative for free tier
+    const MAX_INPUT_TOKENS = {
+      'llama-3.3-70b-versatile': 20000,  // 128K context but 6000 TPM limit
+      'llama-3.1-8b-instant': 4000,      // Very low TPM
+      'meta-llama/llama-4-scout-17b-16e-instruct': 20000,
+      'qwen/qwen3-32b': 20000,
+      'gpt-4o-mini': 100000,
+      'gpt-4o': 100000,
+      'default': 15000
+    };
+    
+    const maxTokens = MAX_INPUT_TOKENS[model] || MAX_INPUT_TOKENS['default'];
+    const estimatedTokens = Math.ceil(transcriptText.length / 4);
+    const systemPromptTokens = 500; // Approximate
+    const availableTokens = maxTokens - systemPromptTokens - 1000; // Leave room for response
+    
+    if (estimatedTokens > availableTokens) {
+      console.log(`[Summary] Transcript too long (${estimatedTokens} tokens), truncating to ${availableTokens} tokens`);
+      const maxChars = availableTokens * 4;
+      transcriptText = transcriptText.substring(0, maxChars) + '\n\n[Transcript truncated for length...]';
+    }
+    
     // Build headers
     const headers = { 'Content-Type': 'application/json' };
     if (config.apiKey) {

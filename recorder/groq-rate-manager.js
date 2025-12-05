@@ -225,8 +225,12 @@ class GroqRateManager {
     console.log(`[GroqRateManager] Step 2: Splitting into ${numChunks} chunks (max ${Math.floor(MAX_CHUNK_SECONDS/60)}min each)`);
     
     // Step 3: Transcribe each chunk
+    // First chunk detects language - if non-English, use translation for all chunks
     const allSegments = [];
     let totalTranscribedDuration = 0;
+    let detectedLanguage = null;
+    let useTranslation = false;
+    let wasTranslated = false;
     
     for (let i = 0; i < numChunks; i++) {
       const startTime = i * MAX_CHUNK_SECONDS;
@@ -242,8 +246,65 @@ class GroqRateManager {
       const chunkSizeMB = chunkWav.size / (1024 * 1024);
       console.log(`[GroqRateManager] Chunk ${i + 1} size: ${chunkSizeMB.toFixed(2)}MB`);
       
-      // Transcribe this chunk with retries
-      const result = await this.transcribeChunkWithRetry(chunkWav, apiKey, model, i + 1, numChunks);
+      // For first chunk, detect language
+      if (i === 0) {
+        const firstResult = await this.transcribeChunkWithRetry(chunkWav, apiKey, model, 1, numChunks, false);
+        detectedLanguage = firstResult.language || 'en';
+        
+        // If non-English, re-do with translation endpoint for English output
+        if (detectedLanguage !== 'en') {
+          console.log(`[GroqRateManager] Detected ${detectedLanguage}, switching to translation endpoint for English output`);
+          useTranslation = true;
+          wasTranslated = true;
+          
+          // Re-process first chunk with translation
+          const translatedResult = await this.transcribeChunkWithRetry(chunkWav, apiKey, model, 1, numChunks, true);
+          
+          if (translatedResult.duration) {
+            this.recordUsage(translatedResult.duration);
+            totalTranscribedDuration += translatedResult.duration;
+          }
+          
+          if (translatedResult.segments) {
+            for (const segment of translatedResult.segments) {
+              allSegments.push({
+                ...segment,
+                start: (segment.start || 0) + startTime,
+                end: (segment.end || 0) + startTime
+              });
+            }
+          } else if (translatedResult.text) {
+            allSegments.push({ text: translatedResult.text, start: startTime, end: endTime });
+          }
+          
+          if (numChunks > 1) await new Promise(r => setTimeout(r, 1000));
+          continue;
+        }
+        
+        // English - use transcription result
+        if (firstResult.duration) {
+          this.recordUsage(firstResult.duration);
+          totalTranscribedDuration += firstResult.duration;
+        }
+        
+        if (firstResult.segments) {
+          for (const segment of firstResult.segments) {
+            allSegments.push({
+              ...segment,
+              start: (segment.start || 0) + startTime,
+              end: (segment.end || 0) + startTime
+            });
+          }
+        } else if (firstResult.text) {
+          allSegments.push({ text: firstResult.text, start: startTime, end: endTime });
+        }
+        
+        if (numChunks > 1) await new Promise(r => setTimeout(r, 1000));
+        continue;
+      }
+      
+      // Subsequent chunks - use detected mode
+      const result = await this.transcribeChunkWithRetry(chunkWav, apiKey, model, i + 1, numChunks, useTranslation);
       
       // Record usage
       if (result.duration) {
@@ -277,13 +338,15 @@ class GroqRateManager {
     // Combine all text
     const fullText = allSegments.map(s => s.text).join(' ');
     
-    console.log(`[GroqRateManager] Transcription complete: ${allSegments.length} segments, ${totalTranscribedDuration.toFixed(1)}s total`);
+    console.log(`[GroqRateManager] Transcription complete: ${allSegments.length} segments, ${totalTranscribedDuration.toFixed(1)}s total${wasTranslated ? ' (translated from ' + detectedLanguage + ')' : ''}`);
     
     return {
       text: fullText,
       segments: allSegments,
       duration: totalTranscribedDuration,
-      language: 'en'
+      language: wasTranslated ? 'en' : detectedLanguage,
+      originalLanguage: detectedLanguage,
+      wasTranslated: wasTranslated
     };
   }
   
@@ -338,15 +401,17 @@ class GroqRateManager {
   
   /**
    * Transcribe a single chunk with retry logic
+   * @param {boolean} useTranslation - If true, use translation endpoint instead of transcription
    */
-  async transcribeChunkWithRetry(wavBlob, apiKey, model, chunkNum, totalChunks) {
+  async transcribeChunkWithRetry(wavBlob, apiKey, model, chunkNum, totalChunks, useTranslation = false) {
     const maxRetries = 3;
     let lastError;
     
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        console.log(`[GroqRateManager] Chunk ${chunkNum}/${totalChunks} - attempt ${attempt}/${maxRetries}`);
-        return await this.transcribeGroq(wavBlob, apiKey, model);
+        const endpoint = useTranslation ? 'translation' : 'transcription';
+        console.log(`[GroqRateManager] Chunk ${chunkNum}/${totalChunks} - ${endpoint} attempt ${attempt}/${maxRetries}`);
+        return await this.transcribeOrTranslate(wavBlob, apiKey, model, useTranslation);
       } catch (error) {
         lastError = error;
         console.error(`[GroqRateManager] Chunk ${chunkNum} attempt ${attempt} failed:`, error.message);
@@ -445,21 +510,33 @@ class GroqRateManager {
   }
   
   /**
-   * Transcribe using Groq API
+   * Transcribe or translate audio using Groq API
+   * @param {Blob} audioBlob - Audio blob to process
+   * @param {string} apiKey - Groq API key
+   * @param {string} model - Whisper model to use
+   * @param {boolean} translate - If true, use translation endpoint (converts any language to English)
    */
-  async transcribeGroq(audioBlob, apiKey, model = 'whisper-large-v3-turbo') {
+  async transcribeOrTranslate(audioBlob, apiKey, model = 'whisper-large-v3-turbo', translate = false) {
     // Determine file extension based on blob type
     const extension = audioBlob.type.includes('wav') ? 'wav' : 
                       audioBlob.type.includes('mp3') ? 'mp3' : 
                       audioBlob.type.includes('mp4') ? 'm4a' : 'webm';
     
+    const endpoint = translate 
+      ? 'https://api.groq.com/openai/v1/audio/translations'
+      : 'https://api.groq.com/openai/v1/audio/transcriptions';
+    
     const formData = new FormData();
     formData.append('file', audioBlob, `audio.${extension}`);
     formData.append('model', model);
     formData.append('response_format', 'verbose_json');
-    formData.append('timestamp_granularities[]', 'segment');
     
-    const response = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+    // Only transcription supports timestamp granularities
+    if (!translate) {
+      formData.append('timestamp_granularities[]', 'segment');
+    }
+    
+    const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`
@@ -469,10 +546,18 @@ class GroqRateManager {
     
     if (!response.ok) {
       const error = await response.json().catch(() => ({ error: { message: response.statusText } }));
-      throw new Error(`Groq API error: ${error.error?.message || response.status}`);
+      const errorType = translate ? 'Translation' : 'Transcription';
+      throw new Error(`Groq ${errorType} API error: ${error.error?.message || response.status}`);
     }
     
-    return response.json();
+    const result = await response.json();
+    
+    if (translate) {
+      result.wasTranslated = true;
+      result.language = 'en';
+    }
+    
+    return result;
   }
   
   /**

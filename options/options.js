@@ -52,8 +52,8 @@ const TRANSCRIPTION_MODELS = {
     { value: 'whisper-1', label: 'Whisper-1 (Standard)', hint: '$0.006/min' }
   ],
   groq: [
-    { value: 'whisper-large-v3-turbo', label: 'Whisper Large V3 Turbo (Fast)', hint: '$0.02/hr - Best value!' },
-    { value: 'whisper-large-v3', label: 'Whisper Large V3 (Accurate)', hint: '$0.02/hr - Best for multilingual' }
+    { value: 'whisper-large-v3-turbo', label: 'Whisper Large V3 Turbo (Fast)', hint: 'Free tier - Best value!' },
+    { value: 'whisper-large-v3', label: 'Whisper Large V3 (Accurate)', hint: 'Free tier - Best for multilingual & translation' }
   ],
   local: [
     { value: 'distil-large-v3', label: 'Distil Large V3 (Recommended)', hint: 'Free - fast & accurate' },
@@ -77,9 +77,9 @@ const SUMMARY_MODELS = {
     { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro (Best Quality)' }
   ],
   groq: [
-    { value: 'llama-3.3-70b-versatile', label: 'Llama 3.3 70B (Best Quality)' },
-    { value: 'llama-3.1-8b-instant', label: 'Llama 3.1 8B Instant (Fastest)' },
-    { value: 'mixtral-8x7b-32768', label: 'Mixtral 8x7B (Balanced)' }
+    { value: 'llama-3.3-70b-versatile', label: 'Llama 3.3 70B (Best - 128K context)', hint: '6000 TPM' },
+    { value: 'meta-llama/llama-4-scout-17b-16e-instruct', label: 'Llama 4 Scout 17B (Fast, Preview)', hint: 'Good for summaries' },
+    { value: 'qwen/qwen3-32b', label: 'Qwen3 32B (Balanced)', hint: '6000 TPM' }
   ],
   openrouter: [
     { value: 'meta-llama/llama-3.1-70b-instruct', label: 'Llama 3.1 70B' },
