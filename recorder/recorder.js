@@ -321,8 +321,7 @@ async function transcribeFullRecording() {
       // Use rate manager for Groq to handle free tier limits
       result = await groqRateManager.transcribeWithRateLimit(audioBlob, {
         apiKey: config.apiKey,
-        model: config.model,
-        preferLocal: false
+        model: config.model
       });
       
       // Update rate limit UI

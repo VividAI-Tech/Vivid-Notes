@@ -58,7 +58,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .logo {
@@ -135,7 +135,7 @@ body {
   color: var(--primary-orange);
 }
 
-/* Platform Banner */
+/* Platform Banner - Compact */
 .platform-banner {
   display: flex;
   align-items: center;
@@ -143,8 +143,9 @@ body {
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
-  padding: 10px 14px;
-  margin-bottom: 16px;
+  padding: 6px 12px;
+  margin-bottom: 10px;
+  font-size: 12px;
 }
 
 .platform-banner.detected {
@@ -169,27 +170,31 @@ body {
   color: var(--success);
 }
 
-/* Timer Section */
+/* Timer Section - Compact */
 .timer-section {
   text-align: center;
-  padding: 20px;
+  padding: 10px 16px;
   background: linear-gradient(135deg, var(--primary-blue-dark), var(--bg-secondary));
-  border-radius: var(--radius-lg);
-  margin-bottom: 16px;
+  border-radius: var(--radius-md);
+  margin-bottom: 10px;
   border: 1px solid var(--primary-blue);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
 }
 
 .timer-display {
-  font-size: 42px;
+  font-size: 28px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   color: var(--text-primary);
-  text-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
+  text-shadow: 0 0 15px rgba(59, 130, 246, 0.4);
 }
 
 .timer-display.recording {
   color: var(--primary-orange);
-  text-shadow: 0 0 20px rgba(249, 115, 22, 0.5);
+  text-shadow: 0 0 15px rgba(249, 115, 22, 0.4);
   animation: pulse 2s infinite;
 }
 
@@ -199,33 +204,38 @@ body {
 }
 
 .timer-label {
-  font-size: 12px;
+  font-size: 10px;
   color: var(--text-muted);
-  margin-top: 4px;
   text-transform: uppercase;
-  letter-spacing: 1px;
+  letter-spacing: 0.5px;
 }
 
-/* Control Buttons */
+/* Control Buttons - Compact */
 .controls {
   display: flex;
-  gap: 12px;
-  margin-bottom: 16px;
+  gap: 8px;
+  margin-bottom: 10px;
 }
 
 .control-btn {
   flex: 1;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  padding: 12px;
+  padding: 8px 12px;
   border: none;
   border-radius: var(--radius-md);
   cursor: pointer;
   transition: all 0.2s ease;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 500;
+}
+
+.control-btn svg {
+  width: 16px;
+  height: 16px;
 }
 
 .record-btn {
@@ -302,14 +312,14 @@ body {
   cursor: pointer;
 }
 
-/* Tabs */
+/* Tabs - Compact */
 .tabs {
   display: flex;
   gap: 4px;
   background: var(--bg-secondary);
   border-radius: var(--radius-md);
-  padding: 4px;
-  margin-bottom: 12px;
+  padding: 3px;
+  margin-bottom: 8px;
 }
 
 .tab-btn {
@@ -317,13 +327,13 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 10px;
+  gap: 4px;
+  padding: 6px 8px;
   background: transparent;
   border: none;
   border-radius: var(--radius-sm);
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -339,11 +349,11 @@ body {
   color: var(--text-primary);
 }
 
-/* Tab Content */
+/* Tab Content - Larger */
 .tab-content {
   flex: 1;
   overflow: hidden;
-  min-height: 180px;
+  min-height: 240px;
 }
 
 .tab-pane {
@@ -573,11 +583,11 @@ body {
   color: var(--primary-orange);
 }
 
-/* Export Section */
+/* Export Section - Compact */
 .export-section {
   display: flex;
-  gap: 10px;
-  margin-top: 12px;
+  gap: 8px;
+  margin-top: 8px;
 }
 
 .export-btn,
@@ -586,13 +596,13 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 10px;
+  gap: 5px;
+  padding: 8px;
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   color: var(--text-primary);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -817,24 +827,24 @@ body {
   color: var(--text-secondary);
 }
 
-/* History Container */
+/* History Container - Larger */
 .history-container {
-  max-height: 200px;
+  max-height: 320px;
   overflow-y: auto;
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
-  padding: 12px;
+  padding: 10px;
 }
 
-/* History Item */
+/* History Item - Compact */
 .history-item {
   display: flex;
   flex-direction: column;
-  padding: 12px;
+  padding: 10px;
   background: var(--bg-tertiary);
   border-radius: var(--radius-md);
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
   border: 1px solid transparent;
@@ -974,14 +984,14 @@ body {
 
 .history-actions {
   display: flex;
-  gap: 8px;
-  margin-top: 8px;
+  gap: 6px;
+  margin-top: 6px;
 }
 
 .history-action-btn {
   flex: 1;
-  padding: 6px 10px;
-  font-size: 11px;
+  padding: 5px 8px;
+  font-size: 10px;
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
@@ -1004,15 +1014,19 @@ body {
 /* Responsive adjustments */
 @media (max-height: 550px) {
   .timer-section {
-    padding: 12px;
+    padding: 8px 12px;
   }
   
   .timer-display {
-    font-size: 32px;
+    font-size: 24px;
   }
   
   .tab-content {
-    min-height: 140px;
+    min-height: 200px;
+  }
+  
+  .history-container {
+    max-height: 280px;
   }
 }
 

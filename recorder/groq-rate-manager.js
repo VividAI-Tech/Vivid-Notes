@@ -186,7 +186,7 @@ class GroqRateManager {
   }
   
   /**
-   * Transcribe with rate limiting
+   * Transcribe with rate limiting, compression, and retry logic
    */
   async transcribeWithRateLimit(audioBlob, options = {}) {
     const { apiKey, model = 'whisper-large-v3-turbo' } = options;
@@ -195,49 +195,183 @@ class GroqRateManager {
       throw new Error('No API key configured for Groq transcription');
     }
     
-    // Get audio duration estimate (rough: 1 second of webm ≈ 16KB at 128kbps)
-    const estimatedDuration = Math.max(
-      this.MIN_CHARGE_SECONDS,
-      Math.ceil(audioBlob.size / 16000)
-    );
+    let fileSizeMB = audioBlob.size / (1024 * 1024);
+    console.log(`[GroqRateManager] Original audio: ${fileSizeMB.toFixed(2)}MB`);
     
-    console.log(`[GroqRateManager] Transcription request: ~${estimatedDuration}s audio, ${(audioBlob.size/1024).toFixed(1)}KB`);
+    // Reset counters if needed
+    this.resetIfNeeded();
     
-    // Check if we can process now
-    if (!this.canProcessNow(estimatedDuration)) {
-      const status = this.getStatus();
-      const waitMinutes = Math.ceil(status.estimatedWaitTime / 60000);
-      throw new Error(`Rate limit reached. Please wait ~${waitMinutes} minutes or until the hour resets.`);
-    }
-    
-    try {
-      const result = await this.transcribeGroq(audioBlob, apiKey, model);
-      
-      // Record actual duration (from API response)
-      const actualDuration = result.duration || estimatedDuration;
-      this.recordUsage(actualDuration);
-      
-      return result;
-    } catch (error) {
-      // Handle rate limit errors from API
-      if (error.message.includes('429') || error.message.includes('rate limit')) {
-        console.log('[GroqRateManager] Hit rate limit, updating usage data');
-        
-        // Mark hourly limit as reached
-        this.usageData.audioSecondsThisHour = this.AUDIO_SECONDS_PER_HOUR;
-        this.saveUsageData();
+    // Compress audio if it's large (>10MB) or close to limit
+    // Speech transcription works fine with compressed audio
+    let processedBlob = audioBlob;
+    if (fileSizeMB > 10) {
+      console.log('[GroqRateManager] Compressing audio for optimal upload...');
+      try {
+        processedBlob = await this.compressAudioForSpeech(audioBlob);
+        const newSizeMB = processedBlob.size / (1024 * 1024);
+        console.log(`[GroqRateManager] Compressed: ${fileSizeMB.toFixed(2)}MB → ${newSizeMB.toFixed(2)}MB (${Math.round((1 - newSizeMB/fileSizeMB) * 100)}% reduction)`);
+        fileSizeMB = newSizeMB;
+      } catch (compressError) {
+        console.warn('[GroqRateManager] Compression failed, using original:', compressError.message);
+        processedBlob = audioBlob;
       }
-      
-      throw error;
     }
+    
+    // Check file size after compression
+    if (fileSizeMB > this.MAX_FILE_SIZE_MB) {
+      throw new Error(`Audio file (${fileSizeMB.toFixed(1)}MB) still exceeds Groq's 25MB limit after compression. Try a shorter recording.`);
+    }
+    
+    // Try transcription with retries for transient errors
+    const maxRetries = 3;
+    let lastError;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`[GroqRateManager] Transcription attempt ${attempt}/${maxRetries}`);
+        const result = await this.transcribeGroq(processedBlob, apiKey, model);
+        
+        // Record actual duration (from API response)
+        const actualDuration = result.duration || 60;
+        this.recordUsage(actualDuration);
+        
+        return result;
+      } catch (error) {
+        lastError = error;
+        console.error(`[GroqRateManager] Attempt ${attempt} failed:`, error.message);
+        
+        // Handle rate limit errors
+        if (error.message.includes('429') || error.message.includes('rate limit')) {
+          console.log('[GroqRateManager] Hit rate limit, updating usage data');
+          this.usageData.audioSecondsThisHour = this.AUDIO_SECONDS_PER_HOUR;
+          this.saveUsageData();
+          throw error; // Don't retry rate limits
+        }
+        
+        // Retry on server errors (500, 502, 503, etc.)
+        if (error.message.includes('500') || error.message.includes('Internal Server Error') ||
+            error.message.includes('502') || error.message.includes('503')) {
+          if (attempt < maxRetries) {
+            const waitTime = attempt * 5000; // 5s, 10s, 15s
+            console.log(`[GroqRateManager] Server error, waiting ${waitTime/1000}s before retry...`);
+            await new Promise(r => setTimeout(r, waitTime));
+            continue;
+          }
+        }
+        
+        // Don't retry other errors
+        throw error;
+      }
+    }
+    
+    throw lastError;
+  }
+  
+  /**
+   * Compress audio for speech transcription without quality loss
+   * Uses 16kHz mono opus - optimal for speech recognition
+   */
+  async compressAudioForSpeech(audioBlob) {
+    return new Promise(async (resolve, reject) => {
+      try {
+        // Decode the audio
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)({
+          sampleRate: 16000 // Optimal for speech recognition
+        });
+        
+        const arrayBuffer = await audioBlob.arrayBuffer();
+        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+        
+        // Create offline context for processing
+        const offlineContext = new OfflineAudioContext(
+          1, // Mono - sufficient for speech
+          audioBuffer.duration * 16000,
+          16000 // 16kHz sample rate
+        );
+        
+        // Create buffer source
+        const source = offlineContext.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(offlineContext.destination);
+        source.start();
+        
+        // Render the audio
+        const renderedBuffer = await offlineContext.startRendering();
+        
+        // Convert to WAV (widely supported, good compression for speech)
+        const wavBlob = this.audioBufferToWav(renderedBuffer);
+        
+        audioContext.close();
+        resolve(wavBlob);
+        
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+  
+  /**
+   * Convert AudioBuffer to WAV blob
+   */
+  audioBufferToWav(buffer) {
+    const numChannels = buffer.numberOfChannels;
+    const sampleRate = buffer.sampleRate;
+    const format = 1; // PCM
+    const bitDepth = 16;
+    
+    const bytesPerSample = bitDepth / 8;
+    const blockAlign = numChannels * bytesPerSample;
+    
+    const samples = buffer.getChannelData(0);
+    const dataLength = samples.length * bytesPerSample;
+    const bufferLength = 44 + dataLength;
+    
+    const arrayBuffer = new ArrayBuffer(bufferLength);
+    const view = new DataView(arrayBuffer);
+    
+    // WAV header
+    const writeString = (offset, string) => {
+      for (let i = 0; i < string.length; i++) {
+        view.setUint8(offset + i, string.charCodeAt(i));
+      }
+    };
+    
+    writeString(0, 'RIFF');
+    view.setUint32(4, bufferLength - 8, true);
+    writeString(8, 'WAVE');
+    writeString(12, 'fmt ');
+    view.setUint32(16, 16, true); // fmt chunk size
+    view.setUint16(20, format, true);
+    view.setUint16(22, numChannels, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * blockAlign, true);
+    view.setUint16(32, blockAlign, true);
+    view.setUint16(34, bitDepth, true);
+    writeString(36, 'data');
+    view.setUint32(40, dataLength, true);
+    
+    // Write audio data
+    let offset = 44;
+    for (let i = 0; i < samples.length; i++) {
+      const sample = Math.max(-1, Math.min(1, samples[i]));
+      view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+      offset += 2;
+    }
+    
+    return new Blob([arrayBuffer], { type: 'audio/wav' });
   }
   
   /**
    * Transcribe using Groq API
    */
   async transcribeGroq(audioBlob, apiKey, model = 'whisper-large-v3-turbo') {
+    // Determine file extension based on blob type
+    const extension = audioBlob.type.includes('wav') ? 'wav' : 
+                      audioBlob.type.includes('mp3') ? 'mp3' : 
+                      audioBlob.type.includes('mp4') ? 'm4a' : 'webm';
+    
     const formData = new FormData();
-    formData.append('file', audioBlob, 'audio.webm');
+    formData.append('file', audioBlob, `audio.${extension}`);
     formData.append('model', model);
     formData.append('response_format', 'verbose_json');
     formData.append('timestamp_granularities[]', 'segment');
