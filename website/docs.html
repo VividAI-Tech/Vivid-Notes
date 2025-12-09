@@ -4,33 +4,39 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    
+
     <!-- Primary SEO Meta Tags -->
     <title>VividAI Documentation - How to Use AI Transcriber & Note Taker</title>
     <meta name="title" content="VividAI Documentation - How to Use AI Transcriber & Note Taker">
-    <meta name="description" content="Complete guide to using VividAI - the free AI transcriber, note taker, and meeting recorder. Learn installation, setup, and features for transcription on Google Meet, Zoom, Teams.">
-    <meta name="keywords" content="vividai docs, how to transcribe meetings, ai transcriber guide, note taker tutorial, meeting recorder help, transcription software guide">
+    <meta name="description"
+        content="Complete guide to using VividAI - the free AI transcriber, note taker, and meeting recorder. Learn installation, setup, and features for transcription on Google Meet, Zoom, Teams.">
+    <meta name="keywords"
+        content="vividai docs, how to transcribe meetings, ai transcriber guide, note taker tutorial, meeting recorder help, transcription software guide">
     <meta name="author" content="VividAI">
     <meta name="robots" content="index, follow">
     <link rel="canonical" href="https://vividai.tech/docs.html">
-    
+
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="article">
     <meta property="og:url" content="https://vividai.tech/docs.html">
     <meta property="og:title" content="VividAI Documentation - AI Transcriber Guide">
-    <meta property="og:description" content="Learn how to use VividAI for meeting transcription, note taking, and AI summaries.">
+    <meta property="og:description"
+        content="Learn how to use VividAI for meeting transcription, note taking, and AI summaries.">
     <meta property="og:image" content="https://vividai.tech/assets/hero-blended.png">
-    
+
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="VividAI Documentation - AI Transcriber Guide">
-    <meta name="twitter:description" content="Learn how to use VividAI for meeting transcription, note taking, and AI summaries.">
+    <meta name="twitter:description"
+        content="Learn how to use VividAI for meeting transcription, note taking, and AI summaries.">
     <meta name="twitter:image" content="https://vividai.tech/assets/hero-blended.png">
-    
+
     <link rel="icon" type="image/png" href="assets/logo.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@500;700;800&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@500;700;800&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <style>
         /* Docs Specific Styles */
@@ -196,7 +202,7 @@
                 <a href="index.html#pricing">Pricing</a>
                 <a href="docs.html" class="active">Docs</a>
             </div>
-            <a href="#" class="btn btn-primary btn-glow">Add to Chrome</a>
+            <!-- <a href="#" class="btn btn-primary btn-glow">Add to Chrome</a> -->
         </div>
     </nav>
 
@@ -221,39 +227,48 @@
 
             <section id="installation" class="docs-section">
                 <h2>Installation</h2>
-                <p>VividAI is a Chrome Extension. Follow these steps to install it:</p>
+                <p>Vivid is a native macOS application. Follow these steps to install it:</p>
                 <ol class="step-list">
                     <li>
-                        <h3>Visit the Chrome Web Store</h3>
-                        <p>Go to the VividAI page on the Chrome Web Store (link coming soon).</p>
+                        <h3>Download the App</h3>
+                        <p>Download the latest <code>Vivid.dmg</code> file from our website.</p>
                     </li>
                     <li>
-                        <h3>Add to Chrome</h3>
-                        <p>Click the "Add to Chrome" button and confirm the installation permissions.</p>
+                        <h3>Install on macOS</h3>
+                        <p>Open the DMG file and drag the <strong>Vivid</strong> app into your
+                            <strong>Applications</strong> folder.
+                        </p>
                     </li>
                     <li>
-                        <h3>Pin the Extension</h3>
-                        <p>Click the puzzle piece icon in your browser toolbar and pin VividAI for easy access.</p>
+                        <h3>Open & Authenticate</h3>
+                        <p>Double-click the app to open it. macOS may ask for permission to open an app downloaded from
+                            the internet—click "Open".</p>
                     </li>
                 </ol>
             </section>
 
             <section id="getting-started" class="docs-section">
                 <h2>Getting Started</h2>
-                <p>Once installed, you need to configure your AI settings.</p>
+                <p>Once installed, you need to grant permissions and configure your AI settings.</p>
 
-                <h3>1. Open Settings</h3>
-                <p>Click the VividAI icon and select the gear icon to open the Options page.</p>
+                <h3>1. Grant Permissions</h3>
+                <p>Vivid requires two key permissions to function correctly:</p>
+                <ul>
+                    <li><strong>Screen Recording:</strong> To capture system audio from meetings.</li>
+                    <li><strong>Accessibility:</strong> To detect when you join meeting URLs.</li>
+                </ul>
+                <p>Follow the prompts in the app to enable these in System Settings.</p>
 
-                <h3>2. Choose Your AI Model</h3>
-                <p>You can use OpenAI (Cloud) or Ollama (Local) for privacy.</p>
+                <h3>2. Configure AI Model</h3>
+                <p>Vivid supports multiple AI providers. We recommend <strong>Groq</strong> for ultra-fast, free
+                    transcription.</p>
                 <div class="code-block">
-                    // Example Configuration
-                    Provider: OpenAI
-                    API Key: sk-proj-... (Your Key)
+                    // Recommended Configuration (Groq)
+                    Provider: Groq
+                    API Key: gsk_... (Get free from console.groq.com)
                 </div>
-                <p><strong>Note:</strong> OpenAI provides $120/month in free credits for new users, which covers
-                    approximately 300 hours of transcription.</p>
+                <p><strong>Note:</strong> Groq provides a generous free tier allowing for approximately 8 hours of
+                    transcription per day.</p>
             </section>
 
             <section id="features" class="docs-section">
